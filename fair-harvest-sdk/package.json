@@ -1,0 +1,14 @@
+{
+  "name": "@fair-harvest/sdk",
+  "version": "0.1.0",
+  "description": "JavaScript client SDK for the Fair Harvest REST API.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
