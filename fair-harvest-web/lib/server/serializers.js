@@ -71,6 +71,47 @@ export function toPublicOrder(order) {
   };
 }
 
+export function toAdminFarmer(profile) {
+  return {
+    farmer_id: profile.id,
+    user_id: profile.userId,
+    name: profile.user.name,
+    email: profile.user.email,
+    phone: profile.user.phone,
+    account_status: profile.user.status.toLowerCase(),
+    district: profile.district,
+    farmer_card_number: profile.farmerCardNumber,
+    nid_number: profile.nidNumber,
+    verification_status: profile.verificationStatus.toLowerCase(),
+    verification_method: profile.verificationMethod ? profile.verificationMethod.toLowerCase() : null,
+    verified_at: profile.verifiedAt,
+    reputation_score: profile.reputationScore,
+    badge: profile.badge,
+    product_count: profile._count?.products ?? 0,
+    created_at: profile.createdAt
+  };
+}
+
+export function toAdminCustomer(user) {
+  return {
+    user_id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    status: user.status.toLowerCase(),
+    order_count: user._count?.orders ?? 0,
+    created_at: user.createdAt
+  };
+}
+
+export function toAdminOrder(order) {
+  return {
+    ...toPublicOrder(order),
+    customer_name: order.user?.name,
+    customer_email: order.user?.email
+  };
+}
+
 export function toPublicFarmerProfile(profile) {
   return {
     farmer_id: profile.id,

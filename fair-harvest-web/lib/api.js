@@ -37,6 +37,50 @@ export function getProduct(productId) {
   return request(`/products/${productId}`);
 }
 
+export function updateProduct(productId, data) {
+  return request(`/products/${productId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function getAdminMetrics() {
+  return request("/admin/metrics");
+}
+
+export function getAdminFarmers() {
+  return request("/admin/farmers");
+}
+
+export function updateAdminFarmer(farmerId, data) {
+  return request(`/admin/farmers/${farmerId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function getAdminVerificationQueue() {
+  return request("/admin/farmers/verifications");
+}
+
+export function approveFarmerVerification(farmerId) {
+  return request(`/admin/farmers/${farmerId}/verification/approve`, { method: "POST" });
+}
+
+export function rejectFarmerVerification(farmerId) {
+  return request(`/admin/farmers/${farmerId}/verification/reject`, { method: "POST" });
+}
+
+export function getAdminProducts() {
+  return request("/admin/products");
+}
+
+export function getAdminCustomers() {
+  return request("/admin/customers");
+}
+
+export function updateAdminCustomer(userId, data) {
+  return request(`/admin/customers/${userId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function getAdminOrders() {
+  return request("/admin/orders");
+}
+
 export function getTrace(productId) {
   return request(`/trace/${productId}`);
 }

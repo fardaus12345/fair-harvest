@@ -701,6 +701,7 @@ h1 {
 .actionRow button,
 .actionRow a,
 .tabs button,
+.tabs a,
 .productCard button,
 .toolPanel button {
   display: inline-flex;
@@ -732,9 +733,16 @@ a:active {
 
 .ghostButton,
 .actionRow a,
-.tabs button {
+.tabs button,
+.tabs a {
   background: #eef5ec;
   color: var(--ink);
+}
+
+.tabs a.active,
+.tabs button.active {
+  background: var(--leaf);
+  color: white;
 }
 
 .formActions {

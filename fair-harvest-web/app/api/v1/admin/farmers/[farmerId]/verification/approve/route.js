@@ -1,0 +1,27 @@
+import { prisma } from "../../../../../../../../lib/server/db.js";
+import { requireRole } from "../../../../../../../../lib/server/auth.js";
+import { ok, handleRoute, ApiError } from "../../../../../../../../lib/server/respond.js";
+import { toAdminFarmer } from "../../../../../../../../lib/server/serializers.js";
+
+export async function POST(request, { params }) {
+  return handleRoute(async () => {
+    const session = requireRole(request, ["ADMIN"]);
+    const { farmerId } = await params;
+
+    const profile = await prisma.farmerProfile.findUnique({ where: { id: farmerId } });
+    if (!profile) throw new ApiError("Farmer not found", 404);
+
+    const updated = await prisma.farmerProfile.update({
+      where: { id: farmerId },
+      data: {
+        verificationStatus: "VERIFIED",
+        verificationMethod: "MANUAL",
+        verifiedAt: new Date(),
+        verifiedByAdminId: session.userId
+      },
+      include: { user: true, _count: { select: { products: true } } }
+    });
+
+    return ok({ farmer: toAdminFarmer(updated) }, { message: "Farmer verified" });
+  });
+}
