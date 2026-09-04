@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { login, register } from "../../lib/api.js";
+import { saveSession } from "../../components/auth/useSession.js";
 
 export default function AuthPage() {
   const [mode, setMode] = useState("login");
@@ -16,9 +17,8 @@ export default function AuthPage() {
     try {
       const data = mode === "login" ? await login({ email: form.email, password: form.password }) : await register(form);
       const token = data.access_token || data.token;
-      window.localStorage.setItem("fairHarvestToken", token);
-      window.localStorage.setItem("fairHarvestUser", JSON.stringify(data.user));
-      window.location.href = "/";
+      saveSession({ token, user: data.user });
+      window.location.href = data.user.role === "farmer" ? "/farmer/dashboard" : "/";
     } catch (err) {
       setError(err.message);
     } finally {

@@ -71,3 +71,15 @@ export function register(data) {
 export function getRewards(userId = "u001") {
   return request(`/users/${userId}/rewards`);
 }
+
+export function getMe() {
+  return request("/auth/me");
+}
+
+export function verifyFarmerCard(farmerId, data) {
+  return request(`/farmers/${farmerId}/verify`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getFarmerVerificationStatus(farmerId) {
+  return request(`/farmers/${farmerId}/verification-status`);
+}

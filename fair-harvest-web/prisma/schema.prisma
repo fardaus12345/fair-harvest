@@ -1,0 +1,260 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CONSUMER
+  FARMER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum VerificationMethod {
+  DEMO_REGISTRY
+  OFFICIAL_API
+  MANUAL
+}
+
+enum GovCardStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ProductCategory {
+  vegetable
+  fruit
+  grain
+  herb
+}
+
+enum ProductStatus {
+  ACTIVE
+  OUT_OF_STOCK
+  ARCHIVED
+}
+
+enum CartItemSource {
+  DIRECT
+  MEAL_PLAN
+  PRESCRIPTION
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  DEMO_CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum TraceStage {
+  PLANTED
+  HARVESTED
+  LAB_TESTED
+  PACKAGED
+  SHIPPED
+  LISTED
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role       @default(CONSUMER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  farmerProfile   FarmerProfile?
+  cart            Cart?
+  orders          Order[]
+  rewardsLedger   RewardsLedger[]
+  verifiedFarmers FarmerProfile[] @relation("VerifiedByAdmin")
+
+  @@index([role])
+}
+
+model FarmerProfile {
+  id                 String              @id @default(cuid())
+  userId             String              @unique
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmerCardNumber   String?
+  nidNumber          String?
+  district           String?
+  verificationStatus VerificationStatus  @default(PENDING)
+  verificationMethod VerificationMethod?
+  verifiedAt         DateTime?
+  verifiedByAdminId  String?
+  verifiedByAdmin    User?               @relation("VerifiedByAdmin", fields: [verifiedByAdminId], references: [id])
+  reputationScore    Int                 @default(70)
+  badge              String              @default("New Farmer")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  products Product[]
+
+  @@index([verificationStatus])
+}
+
+model GovFarmerCardRecord {
+  id         String        @id @default(cuid())
+  cardNumber String        @unique
+  nidNumber  String
+  fullName   String
+  district   String
+  issueDate  DateTime
+  status     GovCardStatus @default(ACTIVE)
+  cropTypes  String?
+}
+
+model Product {
+  id                  String          @id @default(cuid())
+  farmerId            String
+  farmer              FarmerProfile   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  name                String
+  category            ProductCategory
+  description         String?
+  priceBdt            Float
+  quantityKg          Float
+  freshnessWindowDays Int             @default(2)
+  trustScore          Int             @default(80)
+  imageUrl            String?
+  status              ProductStatus   @default(ACTIVE)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  traceEvents TraceEvent[]
+
+  @@index([category])
+  @@index([status])
+}
+
+model Cart {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items CartItem[]
+}
+
+model CartItem {
+  id          String         @id @default(cuid())
+  cartId      String
+  cart        Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityKg  Float
+  unitPriceBdt Float
+  source      CartItemSource @default(DIRECT)
+  createdAt   DateTime       @default(now())
+
+  @@unique([cartId, productId, source])
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  status          OrderStatus   @default(PENDING)
+  totalBdt        Float
+  deliveryFeeBdt  Float         @default(0)
+  deliveryLine1   String
+  deliveryCity    String
+  paymentMethod   PaymentMethod @default(COD)
+  paymentStatus   PaymentStatus @default(PENDING)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items         OrderItem[]
+  statusEvents  OrderStatusEvent[]
+  payment       Payment?
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product @relation(fields: [productId], references: [id])
+  farmerId      String
+  nameSnapshot  String
+  quantityKg    Float
+  unitPriceBdt  Float
+  lineTotalBdt  Float
+
+  @@index([farmerId])
+}
+
+model OrderStatusEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+}
+
+model Payment {
+  id                  String        @id @default(cuid())
+  orderId             String        @unique
+  order               Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method              PaymentMethod
+  amountBdt           Float
+  status              PaymentStatus @default(PENDING)
+  demoTransactionRef  String
+  paidAt              DateTime?
+}
+
+model TraceEvent {
+  id        String     @id @default(cuid())
+  productId String
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stage     TraceStage
+  timestamp DateTime   @default(now())
+  note      String?
+  gpsLat    Float?
+  gpsLng    Float?
+}
+
+model RewardsLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

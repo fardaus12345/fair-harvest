@@ -3,24 +3,27 @@
 import { useEffect, useState } from "react";
 import { Mic, Plus, QrCode, Star } from "lucide-react";
 import { createProduct, getFarmerScore, getProducts, uploadVoice } from "../../../lib/api.js";
+import { useSession } from "../../../components/auth/useSession.js";
 
 export default function FarmerDashboard() {
-  const [user, setUser] = useState({ name: "Farmer", role: "farmer" });
+  const { user: sessionUser, loading: sessionLoading } = useSession();
+  const user = sessionUser || { name: "Farmer", role: "farmer" };
+  const farmerId = sessionUser?.farmer_profile_id || "f001";
+  const isVerified = !sessionUser || sessionUser.farmer_verification_status === "verified";
   const [score, setScore] = useState({ reputation_score: 88, badge: "Trusted Seller", breakdown: {} });
   const [products, setProducts] = useState([]);
   const [voice, setVoice] = useState(null);
   const [draft, setDraft] = useState({ name: "", category: "vegetable", price_bdt: 100, quantity_kg: 10 });
 
   useEffect(() => {
-    const stored = JSON.parse(window.localStorage.getItem("fairHarvestUser") || "{\"name\":\"Farmer\",\"role\":\"farmer\"}");
-    setUser(stored);
-    getFarmerScore("f001").then(setScore).catch(() => null);
-    getProducts({ farmer_id: "f001" }).then((data) => setProducts(data.products || [])).catch(() => null);
-  }, []);
+    if (sessionLoading) return;
+    getFarmerScore(farmerId).then(setScore).catch(() => null);
+    getProducts({ farmer_id: farmerId }).then((data) => setProducts(data.products || [])).catch(() => null);
+  }, [sessionLoading, farmerId]);
 
   async function addProduct(event) {
     event.preventDefault();
-    const product = await createProduct({ product_id: `product-${Date.now()}`, farmer_id: "f001", freshness_window_days: 2, status: "active", ...draft });
+    const product = await createProduct({ product_id: `product-${Date.now()}`, farmer_id: farmerId, freshness_window_days: 2, status: "active", ...draft });
     setProducts([product, ...products]);
   }
 
@@ -38,19 +41,29 @@ export default function FarmerDashboard() {
         <article className="metric"><span>Orders this month</span><strong>42</strong></article>
         <article className="metric"><span>Average rating</span><strong>4.8</strong></article>
       </section>
+      {!isVerified ? (
+        <section className="toolPanel">
+          <span className="badge warn">Verification required</span>
+          <p className="strong">Verify your Farmer Card to start selling</p>
+          <p className="muted">Product listing is locked until your Government Farmer Card is verified.</p>
+          <a className="commandButton" href="/farmer/verify">Verify Farmer Card</a>
+        </section>
+      ) : null}
       <section className="traceGrid">
         <article className="toolPanel wide">
           <div className="splitLine"><h2>My products</h2><button><Plus size={16} /> Add new product</button></div>
           <div className="dataTable">{products.map((product) => <div key={product.product_id}><span>{product.name}</span><span>{product.category}</span><span>{product.price_bdt} BDT</span><span>{product.quantity_kg} kg</span><span>{product.trust_score}%</span><button><QrCode size={14} /> Register QR</button></div>)}</div>
         </article>
-        <form className="toolPanel" onSubmit={addProduct}>
-          <h2>Add product</h2>
-          <label>Name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-          <label>Category<select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}><option value="vegetable">Vegetable</option><option value="fruit">Fruit</option><option value="grain">Grain</option></select></label>
-          <label>Price<input type="number" value={draft.price_bdt} onChange={(event) => setDraft({ ...draft, price_bdt: Number(event.target.value) })} /></label>
-          <label>Stock kg<input type="number" value={draft.quantity_kg} onChange={(event) => setDraft({ ...draft, quantity_kg: Number(event.target.value) })} /></label>
-          <button className="commandButton" type="submit">Save product</button>
-        </form>
+        {isVerified ? (
+          <form className="toolPanel" onSubmit={addProduct}>
+            <h2>Add product</h2>
+            <label>Name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+            <label>Category<select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}><option value="vegetable">Vegetable</option><option value="fruit">Fruit</option><option value="grain">Grain</option></select></label>
+            <label>Price<input type="number" value={draft.price_bdt} onChange={(event) => setDraft({ ...draft, price_bdt: Number(event.target.value) })} /></label>
+            <label>Stock kg<input type="number" value={draft.quantity_kg} onChange={(event) => setDraft({ ...draft, quantity_kg: Number(event.target.value) })} /></label>
+            <button className="commandButton" type="submit">Save product</button>
+          </form>
+        ) : null}
         <article className="toolPanel">
           <h2><Mic size={20} /> Voice Upload</h2>
           <button className="commandButton" onClick={sendVoice}>Hold to record</button>
