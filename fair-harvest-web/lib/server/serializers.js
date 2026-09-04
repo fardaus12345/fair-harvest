@@ -112,6 +112,67 @@ export function toAdminOrder(order) {
   };
 }
 
+function clampScore(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function toPublicTrace(product, traceEvents) {
+  const stage = {};
+  for (const event of traceEvents) stage[event.stage] = event;
+  const gps = stage.HARVESTED || stage.PLANTED;
+
+  return {
+    product_id: product.id,
+    farmer: {
+      name: product.farmer.user.name,
+      location: { lat: gps?.gpsLat ?? null, lng: gps?.gpsLng ?? null },
+      certifications: ["Bangladesh Organic Standard"]
+    },
+    farm_gps_location: { lat: gps?.gpsLat ?? null, lng: gps?.gpsLng ?? null },
+    harvest_date: stage.HARVESTED?.timestamp ?? null,
+    processing_timestamp: stage.LAB_TESTED?.timestamp ?? null,
+    shipping_timestamp: stage.SHIPPED?.timestamp ?? null,
+    shipping_date: stage.SHIPPED?.timestamp ?? null,
+    soil_data: {
+      ph: 6.7,
+      nitrogen: clampScore(product.trustScore - 40),
+      iron: Number((product.trustScore / 12).toFixed(1))
+    },
+    qr_code: `qr_${product.id}`,
+    blockchain_hash: `0xfh${product.id.slice(0, 24)}`,
+    current_freshness_days: product.freshnessWindowDays,
+    verified_on_chain: product.farmer.verificationStatus === "VERIFIED"
+  };
+}
+
+const REWARD_BADGES = [
+  { points: 100, name: "First Harvest" },
+  { points: 500, name: "Organic Warrior" },
+  { points: 1000, name: "7-Day Streak" },
+  { points: 2500, name: "Zero Pesticide Week" },
+  { points: 5000, name: "Health Champion" }
+];
+
+export function toPublicRewards(userId, ledgerEntries) {
+  const points = ledgerEntries.reduce((sum, entry) => sum + entry.points, 0);
+  const streakDays = new Set(ledgerEntries.map((entry) => new Date(entry.createdAt).toDateString())).size;
+  const badges = REWARD_BADGES.filter((badge) => points >= badge.points).map((badge) => badge.name);
+
+  return {
+    user_id: userId,
+    points,
+    reward_points: points,
+    streak_days: streakDays,
+    healthy_order_streak_days: streakDays,
+    badges,
+    recent_activity: ledgerEntries.slice(0, 5).map((entry) => ({
+      reason: entry.reason,
+      points: entry.points,
+      created_at: entry.createdAt
+    }))
+  };
+}
+
 export function toPublicFarmerProfile(profile) {
   return {
     farmer_id: profile.id,

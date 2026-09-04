@@ -39,8 +39,8 @@ export default async function Home() {
     cart,
     order
   ] = await Promise.all([
-    safeApi(() => fairHarvestApi.farmerScore("f001"), fallbackFarmer),
-    safeApi(() => fairHarvestApi.trace("abc123"), fallbackTrace),
+    safeApi(() => fairHarvestApi.farmerScore("seed-farmer-rahim"), fallbackFarmer),
+    safeApi(() => fairHarvestApi.trace("seed-product-spinach"), fallbackTrace),
     safeApi(
       () => fairHarvestApi.recommendNutrition({ age: 35, weight: 72, conditions: ["diabetes", "hypertension"], goal: "weight_loss" }),
       fallbackNutrition
@@ -104,7 +104,7 @@ export default async function Home() {
       }),
       fallbackWaste
     ),
-    safeApi(() => fairHarvestApi.productScores("abc123"), fallbackScores),
+    safeApi(() => fairHarvestApi.productScores("seed-product-spinach"), fallbackScores),
     safeApi(
       () =>
         fairHarvestApi.bookConsultation({

@@ -59,6 +59,7 @@ async function main() {
   const rahimFarmer = await prisma.farmerProfile.upsert({
     where: { userId: rahimUser.id },
     create: {
+      id: "seed-farmer-rahim",
       userId: rahimUser.id,
       farmerCardNumber: "BD-FARM-0001",
       nidNumber: "1990123456789",

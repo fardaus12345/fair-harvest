@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Coins, Flame } from "lucide-react";
 import { getRewards } from "../../lib/api.js";
+import { useSession } from "../../components/auth/useSession.js";
 
 const badges = [
   { points: 100, name: "First Harvest" },
@@ -13,11 +14,24 @@ const badges = [
 ];
 
 export default function RewardsPage() {
+  const { user, loading: sessionLoading } = useSession();
   const [rewards, setRewards] = useState({ points: 1240, streak_days: 9, badges: ["Organic Warrior", "7-Day Streak"] });
 
   useEffect(() => {
-    getRewards("u001").then(setRewards).catch(() => null);
-  }, []);
+    if (sessionLoading || !user) return;
+    getRewards(user.id).then(setRewards).catch(() => null);
+  }, [sessionLoading, user]);
+
+  if (!sessionLoading && !user) {
+    return (
+      <main className="appPage">
+        <div className="toolPanel">
+          <p className="muted">Log in to see your rewards.</p>
+          <a className="commandButton" href="/auth">Go to login</a>
+        </div>
+      </main>
+    );
+  }
 
   const next = badges.find((badge) => badge.points > (rewards.points || rewards.reward_points)) || badges[badges.length - 1];
   const points = rewards.points || rewards.reward_points || 0;
