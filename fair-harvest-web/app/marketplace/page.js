@@ -58,8 +58,8 @@ export default function MarketplacePage() {
             {visibleProducts.map((product) => (
               <article className="productCard" key={product.product_id}>
                 <div className="produceTile">{product.category === "fruit" ? "Fruit" : "Fresh"}</div>
-                <div className="splitLine"><h2>{product.name}</h2><span className={product.trust_score > 80 ? "badge good" : "badge warn"}>{product.trust_score}%</span></div>
-                <p className="muted">Farm {product.farmer_id} · Dhaka district</p>
+                <div className="splitLine"><h2><a href={`/marketplace/${product.product_id}`}>{product.name}</a></h2><span className={product.trust_score > 80 ? "badge good" : "badge warn"}>{product.trust_score}%</span></div>
+                <p className="muted">{product.farmer_name ? `${product.farmer_name} · ${product.farmer_district || "Bangladesh"}` : `Farm ${product.farmer_id} · Dhaka district`}</p>
                 <div className="bar"><span style={{ width: `${Math.min(100, product.freshness_window_days * 30)}%` }} /></div>
                 <div className="splitLine"><strong>{product.price_bdt} BDT/kg</strong><span className="badge">Eco A</span></div>
                 <div className="actionRow"><button><ShoppingCart size={16} /> Add</button><a href={`/trace/${product.product_id}`}>View trace</a></div>

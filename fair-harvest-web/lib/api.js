@@ -33,6 +33,10 @@ export function createProduct(data) {
   return request("/products", { method: "POST", body: JSON.stringify(data) });
 }
 
+export function getProduct(productId) {
+  return request(`/products/${productId}`);
+}
+
 export function getTrace(productId) {
   return request(`/trace/${productId}`);
 }

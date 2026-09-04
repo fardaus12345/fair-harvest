@@ -11,6 +11,26 @@ export function toPublicUser(user) {
   };
 }
 
+export function toPublicProduct(product) {
+  return {
+    product_id: product.id,
+    farmer_id: product.farmerId,
+    farmer_name: product.farmer?.user?.name,
+    farmer_district: product.farmer?.district,
+    farmer_verification_status: product.farmer?.verificationStatus ? product.farmer.verificationStatus.toLowerCase() : undefined,
+    name: product.name,
+    category: product.category,
+    description: product.description || "",
+    price_bdt: product.priceBdt,
+    quantity_kg: product.quantityKg,
+    freshness_window_days: product.freshnessWindowDays,
+    trust_score: product.trustScore,
+    image_url: product.imageUrl || null,
+    status: product.status.toLowerCase(),
+    created_at: product.createdAt
+  };
+}
+
 export function toPublicFarmerProfile(profile) {
   return {
     farmer_id: profile.id,
