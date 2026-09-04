@@ -80,6 +80,42 @@ export function getMe() {
   return request("/auth/me");
 }
 
+export function getCart(userId) {
+  return request(`/cart/${userId}`);
+}
+
+export function addCartItem(userId, data) {
+  return request(`/cart/${userId}/items`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateCartItem(userId, itemId, data) {
+  return request(`/cart/${userId}/items/${itemId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export function removeCartItem(userId, itemId) {
+  return request(`/cart/${userId}/items/${itemId}`, { method: "DELETE" });
+}
+
+export function clearCart(userId) {
+  return request(`/cart/${userId}`, { method: "DELETE" });
+}
+
+export function checkout(userId, data) {
+  return request(`/orders/${userId}/checkout`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getOrders(userId) {
+  return request(`/orders/${userId}`);
+}
+
+export function getOrderDetail(orderId) {
+  return request(`/orders/detail/${orderId}`);
+}
+
+export function updateOrderStatus(orderId, data) {
+  return request(`/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
 export function verifyFarmerCard(farmerId, data) {
   return request(`/farmers/${farmerId}/verify`, { method: "POST", body: JSON.stringify(data) });
 }

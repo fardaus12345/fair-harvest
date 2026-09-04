@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, ShoppingCart, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { getProducts } from "../../lib/api.js";
+import AddToCartButton from "../../components/cart/AddToCartButton.js";
 
 const fallbackProducts = [
   { product_id: "abc123", name: "Organic Spinach", category: "vegetable", farmer_id: "f001", trust_score: 88, freshness_window_days: 2, price_bdt: 120, status: "active" },
@@ -62,7 +63,7 @@ export default function MarketplacePage() {
                 <p className="muted">{product.farmer_name ? `${product.farmer_name} · ${product.farmer_district || "Bangladesh"}` : `Farm ${product.farmer_id} · Dhaka district`}</p>
                 <div className="bar"><span style={{ width: `${Math.min(100, product.freshness_window_days * 30)}%` }} /></div>
                 <div className="splitLine"><strong>{product.price_bdt} BDT/kg</strong><span className="badge">Eco A</span></div>
-                <div className="actionRow"><button><ShoppingCart size={16} /> Add</button><a href={`/trace/${product.product_id}`}>View trace</a></div>
+                <div className="actionRow"><AddToCartButton productId={product.product_id} label="Add" /><a href={`/trace/${product.product_id}`}>View trace</a></div>
               </article>
             ))}
           </div>

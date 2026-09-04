@@ -3,6 +3,8 @@ import LanguageToggle from "../i18n/LanguageToggle.js";
 
 const links = [
   { href: "/marketplace", label: "Marketplace" },
+  { href: "/cart", label: "Cart" },
+  { href: "/orders", label: "Orders" },
   { href: "/farmer/dashboard", label: "Farmers" },
   { href: "/scan", label: "AI Tools" },
   { href: "/nutrition", label: "Nutrition" },

@@ -31,6 +31,46 @@ export function toPublicProduct(product) {
   };
 }
 
+export function toPublicCart(userId, cart) {
+  const items = (cart?.items || []).map((item) => ({
+    cart_item_id: item.id,
+    product_id: item.productId,
+    name: item.product.name,
+    price_bdt: item.unitPriceBdt,
+    quantity_kg: item.quantityKg,
+    source: item.source.toLowerCase(),
+    line_total_bdt: Number((item.unitPriceBdt * item.quantityKg).toFixed(2))
+  }));
+  const subtotal = Number(items.reduce((sum, item) => sum + item.line_total_bdt, 0).toFixed(2));
+  return { user_id: userId, items, subtotal_bdt: subtotal, item_count: items.length };
+}
+
+export function toPublicOrder(order) {
+  return {
+    order_id: order.id,
+    user_id: order.userId,
+    status: order.status.toLowerCase(),
+    total_bdt: order.totalBdt,
+    delivery_fee_bdt: order.deliveryFeeBdt,
+    delivery_address: { line1: order.deliveryLine1, city: order.deliveryCity },
+    payment_method: order.paymentMethod.toLowerCase(),
+    payment_status: order.paymentStatus.toLowerCase(),
+    created_at: order.createdAt,
+    items: (order.items || []).map((item) => ({
+      product_id: item.productId,
+      farmer_id: item.farmerId,
+      name: item.nameSnapshot,
+      quantity_kg: item.quantityKg,
+      unit_price_bdt: item.unitPriceBdt,
+      line_total_bdt: item.lineTotalBdt
+    })),
+    status_events: (order.statusEvents || [])
+      .slice()
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+      .map((event) => ({ status: event.status.toLowerCase(), note: event.note || null, created_at: event.createdAt }))
+  };
+}
+
 export function toPublicFarmerProfile(profile) {
   return {
     farmer_id: profile.id,

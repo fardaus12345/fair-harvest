@@ -2,6 +2,7 @@ import { Leaf } from "lucide-react";
 
 const footerLinks = [
   { href: "/marketplace", label: "Marketplace" },
+  { href: "/orders", label: "Orders" },
   { href: "/nutrition", label: "Nutrition" },
   { href: "/scan", label: "Scanner" },
   { href: "/farmer/dashboard", label: "Farmers" },
