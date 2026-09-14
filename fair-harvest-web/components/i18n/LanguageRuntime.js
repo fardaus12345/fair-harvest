@@ -74,10 +74,23 @@ function translateTextNodes(root, language) {
   while (walker.nextNode()) nodes.push(walker.currentNode);
 
   nodes.forEach((node) => {
-    if (!originalText.has(node)) originalText.set(node, node.nodeValue);
-    const source = originalText.get(node);
-    const nextValue = translateValue(source, language);
+    // React updates a text node in place (textInstance.nodeValue = next) rather
+    // than replacing it, so a node we have already cached can legitimately hold
+    // new application data. We therefore remember both the English source and
+    // the value we ourselves last wrote: if the node no longer holds what we
+    // wrote, React (or any other code) changed it, and the new value becomes
+    // the source. Without this the cached value was written back over every
+    // live update — the farmer dashboard's metrics stayed frozen at their
+    // first-render placeholders while the rest of the page showed real data.
+    const cached = originalText.get(node);
+    if (!cached || cached.applied !== node.nodeValue) {
+      originalText.set(node, { source: node.nodeValue, applied: node.nodeValue });
+    }
+
+    const entry = originalText.get(node);
+    const nextValue = translateValue(entry.source, language);
     if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
+    entry.applied = nextValue;
   });
 }
 

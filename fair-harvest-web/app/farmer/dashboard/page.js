@@ -8,9 +8,11 @@ import { useSession } from "../../../components/auth/useSession.js";
 export default function FarmerDashboard() {
   const { user: sessionUser, loading: sessionLoading } = useSession();
   const user = sessionUser || { name: "Farmer", role: "farmer" };
-  const farmerId = sessionUser?.farmer_profile_id || "f001";
+  const farmerId = sessionUser?.farmer_profile_id || null;
   const isVerified = !sessionUser || sessionUser.farmer_verification_status === "verified";
-  const [score, setScore] = useState({ reputation_score: 88, badge: "Trusted Seller", breakdown: {}, average_rating: null, review_count: 0 });
+  // No seeded placeholder score: showing a hardcoded reputation before the real
+  // one loads would put a number on screen that the farmer has not earned.
+  const [score, setScore] = useState(null);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [earnings, setEarnings] = useState(null);
@@ -19,7 +21,7 @@ export default function FarmerDashboard() {
   const [draft, setDraft] = useState({ name: "", category: "vegetable", price_bdt: 100, quantity_kg: 10 });
 
   useEffect(() => {
-    if (sessionLoading) return;
+    if (sessionLoading || !farmerId) return;
     getFarmerScore(farmerId).then(setScore).catch(() => null);
     getProducts({ farmer_id: farmerId }).then((data) => setProducts(data.products || [])).catch(() => null);
     if (sessionUser) {
@@ -51,12 +53,12 @@ export default function FarmerDashboard() {
 
   return (
     <main className="appPage">
-      <header className="pageHeader"><div><p className="eyebrow">Farmer dashboard</p><h1>Welcome back, {user.name}</h1></div><span className="badge good">{score.reputation_score}% · {score.badge}</span></header>
+      <header className="pageHeader"><div><p className="eyebrow">Farmer dashboard</p><h1>Welcome back, {user.name}</h1></div>{score ? <span className="badge good">{score.reputation_score}% · {score.badge}</span> : null}</header>
       <section className="metricGrid compact">
-        <article className="metric"><span>Reputation</span><strong>{score.reputation_score}</strong></article>
+        <article className="metric"><span>Reputation</span><strong>{score ? score.reputation_score : "—"}</strong></article>
         <article className="metric"><span>Active products</span><strong>{products.length}</strong></article>
         <article className="metric"><span>Orders received</span><strong>{orders.length}</strong></article>
-        <article className="metric"><span>Average rating</span><strong>{score.average_rating != null ? score.average_rating : `No reviews yet (${score.review_count || 0})`}</strong></article>
+        <article className="metric"><span>Average rating</span><strong>{!score ? "—" : score.average_rating != null ? score.average_rating : `No reviews yet (${score.review_count || 0})`}</strong></article>
       </section>
       {!isVerified ? (
         <section className="toolPanel">
@@ -132,7 +134,7 @@ export default function FarmerDashboard() {
         </article>
         <article className="toolPanel">
           <h2><Star size={20} /> Reputation breakdown</h2>
-          {Object.entries(score.breakdown || {}).map(([key, value]) => <div className="scoreRow" key={key}><div><span>{key.replace("_", " ")}</span><strong>{value}</strong></div><div className="bar"><span style={{ width: `${value}%` }} /></div></div>)}
+          {Object.entries((score && score.breakdown) || {}).map(([key, value]) => <div className="scoreRow" key={key}><div><span>{key.replace("_", " ")}</span><strong>{value}</strong></div><div className="bar"><span style={{ width: `${value}%` }} /></div></div>)}
         </article>
       </section>
     </main>
