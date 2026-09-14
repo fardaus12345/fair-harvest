@@ -1,17 +1,24 @@
+"use client";
+
 import { Leaf, Menu } from "lucide-react";
 import LanguageToggle from "../i18n/LanguageToggle.js";
+import { useSession, clearSession } from "../auth/useSession.js";
 
-const links = [
+const baseLinks = [
   { href: "/marketplace", label: "Marketplace" },
   { href: "/cart", label: "Cart" },
   { href: "/orders", label: "Orders" },
+  { href: "/wishlist", label: "Wishlist" },
   { href: "/farmer/dashboard", label: "Farmers" },
   { href: "/scan", label: "AI Tools" },
   { href: "/nutrition", label: "Nutrition" },
   { href: "/rewards", label: "Rewards" }
 ];
 
-export default function Navbar({ connected = true }) {
+export default function Navbar() {
+  const { user, loading } = useSession();
+  const links = [...baseLinks, ...(user ? [{ href: "/account", label: "Account" }] : [])];
+
   return (
     <header className="globalHeader">
       <nav className="topbar" aria-label="Main navigation">
@@ -28,8 +35,14 @@ export default function Navbar({ connected = true }) {
 
       <div className="navActions">
         <LanguageToggle />
-        <span className="navStatus">API: {connected ? "connected" : "offline mode"}</span>
-        <a className="navCta" href="/auth">Get started</a>
+        {!loading && user ? (
+          <>
+            <span className="navStatus">Hi, {user.name}</span>
+            <button type="button" className="navCta" onClick={() => { clearSession(); window.location.href = "/"; }}>Log out</button>
+          </>
+        ) : (
+          <a className="navCta" href="/auth">Get started</a>
+        )}
         <details className="mobileNav">
           <summary className="hamburger" aria-label="Toggle navigation">
             <Menu size={22} />
@@ -38,7 +51,11 @@ export default function Navbar({ connected = true }) {
             {links.map((link) => (
               <a key={link.href} href={link.href}>{link.label}</a>
             ))}
-            <a href="/auth">Get started</a>
+            {!loading && user ? (
+              <button type="button" onClick={() => { clearSession(); window.location.href = "/"; }}>Log out</button>
+            ) : (
+              <a href="/auth">Get started</a>
+            )}
           </div>
         </details>
       </div>

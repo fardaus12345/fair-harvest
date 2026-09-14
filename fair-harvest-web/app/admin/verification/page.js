@@ -40,7 +40,7 @@ export default function AdminVerificationPage() {
           <div key={farmer.farmer_id}>
             <span>{farmer.name}</span>
             <span>{farmer.email}</span>
-            <span>{farmer.farmer_card_number || "Not submitted"}</span>
+            <span>{farmer.farmer_card_number_masked || "Not submitted"}</span>
             <span>{farmer.district || "—"}</span>
             <span className="badge warn">{farmer.verification_status}</span>
             <span className="actionRow">

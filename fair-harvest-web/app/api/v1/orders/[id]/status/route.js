@@ -3,6 +3,7 @@ import { prisma } from "../../../../../../lib/server/db.js";
 import { requireUser } from "../../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../../lib/server/respond.js";
 import { toPublicOrder } from "../../../../../../lib/server/serializers.js";
+import { recomputeFarmerReputation } from "../../../../../../lib/server/reputationSync.js";
 
 const statusSchema = z.object({
   status: z.enum(["pending", "confirmed", "shipped", "delivered", "cancelled"]),
@@ -36,6 +37,11 @@ export async function PATCH(request, { params }) {
       },
       include: { items: true, statusEvents: true }
     });
+
+    if (nextStatus === "DELIVERED" || nextStatus === "CANCELLED") {
+      const farmerIds = [...new Set(updated.items.map((item) => item.farmerId))];
+      await Promise.all(farmerIds.map((id) => recomputeFarmerReputation(id)));
+    }
 
     return ok({ order: toPublicOrder(updated) }, { message: "Order updated" });
   });

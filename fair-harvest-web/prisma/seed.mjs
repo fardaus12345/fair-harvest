@@ -145,7 +145,7 @@ async function main() {
     const order = await prisma.order.create({
       data: {
         userId: consumer.id,
-        status: "SHIPPED",
+        status: "DELIVERED",
         totalBdt: 120 + 60,
         deliveryFeeBdt: 60,
         deliveryLine1: "House 12, Green Road",
@@ -161,7 +161,8 @@ async function main() {
           create: [
             { status: "PENDING", note: "Order placed" },
             { status: "CONFIRMED", note: "Farmer confirmed availability" },
-            { status: "SHIPPED", note: "Out for delivery" }
+            { status: "SHIPPED", note: "Out for delivery" },
+            { status: "DELIVERED", note: "Delivered to customer" }
           ]
         }
       }

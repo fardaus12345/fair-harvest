@@ -3,6 +3,7 @@ import { prisma } from "../../../../../lib/server/db.js";
 import { verifyPassword, signToken } from "../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../lib/server/respond.js";
 import { toPublicUser } from "../../../../../lib/server/serializers.js";
+import { enforceRateLimit } from "../../../../../lib/server/rateLimit.js";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -11,6 +12,7 @@ const loginSchema = z.object({
 
 export async function POST(request) {
   return handleRoute(async () => {
+    enforceRateLimit(request, "auth-login", { max: 10, windowMs: 60_000 });
     const body = await request.json().catch(() => ({}));
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {

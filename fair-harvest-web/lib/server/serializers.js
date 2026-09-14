@@ -1,3 +1,5 @@
+import { maskIdentifier } from "./mask.js";
+
 export function toPublicUser(user) {
   return {
     id: user.id,
@@ -57,6 +59,7 @@ export function toPublicOrder(order) {
     payment_status: order.paymentStatus.toLowerCase(),
     created_at: order.createdAt,
     items: (order.items || []).map((item) => ({
+      order_item_id: item.id,
       product_id: item.productId,
       farmer_id: item.farmerId,
       name: item.nameSnapshot,
@@ -80,8 +83,10 @@ export function toAdminFarmer(profile) {
     phone: profile.user.phone,
     account_status: profile.user.status.toLowerCase(),
     district: profile.district,
-    farmer_card_number: profile.farmerCardNumber,
-    nid_number: profile.nidNumber,
+    // Never expose full NID / Farmer Card numbers, even to admins — masked
+    // consistently everywhere this data leaves the server (see lib/server/mask.js).
+    farmer_card_number_masked: maskIdentifier(profile.farmerCardNumber),
+    nid_number_masked: maskIdentifier(profile.nidNumber),
     verification_status: profile.verificationStatus.toLowerCase(),
     verification_method: profile.verificationMethod ? profile.verificationMethod.toLowerCase() : null,
     verified_at: profile.verifiedAt,
@@ -112,9 +117,15 @@ export function toAdminOrder(order) {
   };
 }
 
-function clampScore(value) {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
+const TRACE_STAGE_LABELS = {
+  PLANTED: "Planted",
+  HARVESTED: "Harvested",
+  LAB_TESTED: "Lab tested",
+  PACKAGED: "Packaged",
+  SHIPPED: "Shipped",
+  LISTED: "Listed"
+};
+const TRACE_STAGE_ORDER = Object.keys(TRACE_STAGE_LABELS);
 
 export function toPublicTrace(product, traceEvents) {
   const stage = {};
@@ -133,15 +144,24 @@ export function toPublicTrace(product, traceEvents) {
     processing_timestamp: stage.LAB_TESTED?.timestamp ?? null,
     shipping_timestamp: stage.SHIPPED?.timestamp ?? null,
     shipping_date: stage.SHIPPED?.timestamp ?? null,
-    soil_data: {
-      ph: 6.7,
-      nitrogen: clampScore(product.trustScore - 40),
-      iron: Number((product.trustScore / 12).toFixed(1))
-    },
-    qr_code: `qr_${product.id}`,
-    blockchain_hash: `0xfh${product.id.slice(0, 24)}`,
+    // trace_events: the real, growing event log the farmer builds up. Steps
+    // with no matching event yet are "pending" — no fabricated timestamps.
+    trace_events: TRACE_STAGE_ORDER.map((key) => ({
+      stage: key,
+      label: TRACE_STAGE_LABELS[key],
+      completed: Boolean(stage[key]),
+      timestamp: stage[key]?.timestamp ?? null,
+      note: stage[key]?.note ?? null,
+      gps_lat: stage[key]?.gpsLat ?? null,
+      gps_lng: stage[key]?.gpsLng ?? null
+    })),
     current_freshness_days: product.freshnessWindowDays,
-    verified_on_chain: product.farmer.verificationStatus === "VERIFIED"
+    // No blockchain or external ledger is integrated. This is intentionally
+    // not present as a "verified_on_chain" boolean — that would misrepresent
+    // a database record as an on-chain fact.
+    qr_code: `qr_${product.id}`,
+    ledger_type: "database",
+    verification_note: "Traceability data is stored in the Fair Harvest database and entered by the farmer. No blockchain or third-party ledger is used."
   };
 }
 

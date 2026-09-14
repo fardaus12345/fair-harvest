@@ -984,6 +984,47 @@ select {
   font-weight: 900;
 }
 
+.supplyTimeline li.pending > span {
+  background: #eee;
+  color: #999;
+}
+
+.supplyTimeline li.pending strong {
+  color: #999;
+}
+
+.traceEventForm {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.traceEventForm label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.formError {
+  color: #c0392b;
+  font-size: 13px;
+  margin: 0;
+}
+
+.wishlistButton.active {
+  color: #c0392b;
+}
+
+.demoBanner {
+  background: #fff8e1;
+  border: 1px solid #f0d98c;
+  color: #7a5b00;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 12px 0;
+}
+
 .fieldSet,
 .resultStack,
 .dataTable {

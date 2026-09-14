@@ -3,6 +3,7 @@ import { prisma } from "../../../../../lib/server/db.js";
 import { hashPassword, signToken } from "../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../lib/server/respond.js";
 import { toPublicUser } from "../../../../../lib/server/serializers.js";
+import { enforceRateLimit } from "../../../../../lib/server/rateLimit.js";
 
 const registerSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -13,6 +14,7 @@ const registerSchema = z.object({
 
 export async function POST(request) {
   return handleRoute(async () => {
+    enforceRateLimit(request, "auth-register", { max: 6, windowMs: 60_000 });
     const body = await request.json().catch(() => ({}));
     const parsed = registerSchema.safeParse(body);
     if (!parsed.success) {

@@ -1,4 +1,6 @@
-const API_ROOT = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+// Same-origin by default — this app serves its own API routes under
+// /api/v1, so there is no separate backend host to fall back to.
+const API_ROOT = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 async function request(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
@@ -83,6 +85,55 @@ export function getAdminOrders() {
 
 export function getTrace(productId) {
   return request(`/trace/${productId}`);
+}
+
+export function addTraceEvent(productId, data) {
+  return request(`/trace/${productId}`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getReviews(query) {
+  const params = new URLSearchParams(query).toString();
+  return request(`/reviews${params ? `?${params}` : ""}`);
+}
+
+export function submitReview(data) {
+  return request("/reviews", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function getWishlist() {
+  return request("/wishlist");
+}
+
+export function addToWishlist(productId) {
+  return request("/wishlist", { method: "POST", body: JSON.stringify({ product_id: productId }) });
+}
+
+export function getWishlistStatus(productId) {
+  return request(`/wishlist/${productId}`);
+}
+
+export function removeFromWishlist(productId) {
+  return request(`/wishlist/${productId}`, { method: "DELETE" });
+}
+
+export function getFarmerProfile(farmerId) {
+  return request(`/farmers/${farmerId}/profile`);
+}
+
+export function getFarmerOrders() {
+  return request("/farmer/orders");
+}
+
+export function getFarmerEarnings() {
+  return request("/farmer/earnings");
+}
+
+export function getAdminReviews() {
+  return request("/admin/reviews");
+}
+
+export function moderateReview(reviewId, status) {
+  return request(`/admin/reviews/${reviewId}`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
 
 export function getFarmerScore(farmerId) {

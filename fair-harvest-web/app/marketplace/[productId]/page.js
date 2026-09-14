@@ -1,6 +1,8 @@
 import { BadgeCheck, Link as LinkIcon } from "lucide-react";
 import { getProduct } from "../../../lib/api.js";
 import AddToCartButton from "../../../components/cart/AddToCartButton.js";
+import WishlistButton from "../../../components/wishlist/WishlistButton.js";
+import ReviewsSection from "../../../components/reviews/ReviewsSection.js";
 
 export default async function ProductDetailPage({ params }) {
   const { productId } = await params;
@@ -50,6 +52,7 @@ export default async function ProductDetailPage({ params }) {
           </div>
           <div className="actionRow">
             <AddToCartButton productId={product.product_id} />
+            <WishlistButton productId={product.product_id} />
             <a href={`/trace/${product.product_id}`}><LinkIcon size={16} /> View trace</a>
           </div>
         </article>
@@ -61,12 +64,15 @@ export default async function ProductDetailPage({ params }) {
           <span className={product.farmer_verification_status === "verified" ? "badge good" : "badge warn"}>
             {product.farmer_verification_status === "verified" ? "Verified farmer" : "Verification pending"}
           </span>
+          {product.farmer_id && <a className="commandButton" href={`/farmers/${product.farmer_id}`}>View farmer profile</a>}
         </article>
 
         <article className="toolPanel">
           <h2>Status</h2>
           <p className="muted">Listing status: <strong>{product.status}</strong></p>
         </article>
+
+        <ReviewsSection productId={product.product_id} />
       </section>
     </main>
   );

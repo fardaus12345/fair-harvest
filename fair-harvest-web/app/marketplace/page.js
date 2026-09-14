@@ -16,13 +16,22 @@ export default function MarketplacePage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     getProducts(filters)
-      .then((data) => active && setProducts(data.products || []))
-      .catch(() => active && setProducts(fallbackProducts))
+      .then((data) => {
+        if (!active) return;
+        setProducts(data.products || []);
+        setLoadError(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setProducts(fallbackProducts);
+        setLoadError(true);
+      })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -53,6 +62,7 @@ export default function MarketplacePage() {
             <label className="searchBox"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search produce" /></label>
             <button className="filterToggle" type="button" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={18} /> Filters</button>
           </div>
+          {loadError ? <p className="demoBanner">Could not reach the marketplace API — showing 2 example listings only.</p> : null}
           {loading ? <div className="cardGrid">{Array.from({ length: 6 }).map((_, index) => <div className="skeletonCard" key={index} />)}</div> : null}
           {!loading && visibleProducts.length === 0 ? <div className="emptyState">No products match your filters.</div> : null}
           <div className="cardGrid">

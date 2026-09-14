@@ -4,6 +4,8 @@ import { requireOwnerOrRole } from "../../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../../lib/server/respond.js";
 import { toPublicFarmerProfile } from "../../../../../../lib/server/serializers.js";
 import { verifyFarmerCard } from "../../../../../../lib/server/verification/index.js";
+import { recomputeFarmerReputation } from "../../../../../../lib/server/reputationSync.js";
+import { enforceRateLimit } from "../../../../../../lib/server/rateLimit.js";
 
 const verifySchema = z.object({
   farmer_card_number: z.string().min(1, "Farmer Card number is required"),
@@ -13,6 +15,8 @@ const verifySchema = z.object({
 
 export async function POST(request, { params }) {
   return handleRoute(async () => {
+    enforceRateLimit(request, "farmer-verify", { max: 8, windowMs: 60_000 });
+
     const { farmerId } = await params;
     const profile = await prisma.farmerProfile.findUnique({ where: { id: farmerId }, include: { user: true } });
     if (!profile) throw new ApiError("Farmer profile not found", 404);
@@ -38,6 +42,8 @@ export async function POST(request, { params }) {
       },
       include: { user: true }
     });
+
+    await recomputeFarmerReputation(farmerId);
 
     return ok(
       { farmer: toPublicFarmerProfile(updated), matched: result.matched, reason: result.reason },

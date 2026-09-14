@@ -1,28 +1,25 @@
-import { prisma } from "../../../../../../lib/server/db.js";
-import { ok, handleRoute, ApiError } from "../../../../../../lib/server/respond.js";
-
-function clamp(value) {
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
+import { handleRoute, ApiError, ok } from "../../../../../../lib/server/respond.js";
+import { getFarmerReputationBreakdown } from "../../../../../../lib/server/reputationSync.js";
 
 export async function GET(request, { params }) {
   return handleRoute(async () => {
     const { farmerId } = await params;
-    const profile = await prisma.farmerProfile.findUnique({ where: { id: farmerId }, include: { user: true } });
-    if (!profile) throw new ApiError("Farmer profile not found", 404);
+    const result = await getFarmerReputationBreakdown(farmerId);
+    if (!result) throw new ApiError("Farmer profile not found", 404);
+    const { profile, breakdown, reviewCount, avgRating } = result;
 
-    const base = profile.reputationScore;
     return ok({
       farmer_id: profile.id,
-      name: profile.user.name,
-      reputation_score: base,
+      reputation_score: breakdown.overall_score,
       badge: profile.badge,
       verification_status: profile.verificationStatus.toLowerCase(),
+      review_count: reviewCount,
+      average_rating: avgRating !== null ? Number(avgRating.toFixed(2)) : null,
       breakdown: {
-        quality_score: clamp(base),
-        delivery_score: clamp(base - 4),
-        review_score: clamp(base + 2),
-        cert_score: clamp(profile.verificationStatus === "VERIFIED" ? base + 7 : base - 10)
+        quality_score: breakdown.review_score,
+        delivery_score: breakdown.delivery_score,
+        review_score: breakdown.review_score,
+        cert_score: breakdown.verification_score
       }
     });
   });

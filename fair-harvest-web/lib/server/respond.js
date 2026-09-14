@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { ApiError } from "./apiError.js";
+
+export { ApiError };
 
 export function ok(data, { message = "OK", status = 200 } = {}) {
   return NextResponse.json({ success: true, data, message }, { status });
@@ -6,13 +9,6 @@ export function ok(data, { message = "OK", status = 200 } = {}) {
 
 export function fail(message, { status = 400, data = null } = {}) {
   return NextResponse.json({ success: false, data, message }, { status });
-}
-
-export class ApiError extends Error {
-  constructor(message, status = 400) {
-    super(message);
-    this.status = status;
-  }
 }
 
 export async function handleRoute(fn) {

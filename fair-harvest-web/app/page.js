@@ -145,6 +145,8 @@ export default async function Home() {
 
   const dailyCalories = nutrition.data.daily_calorie_target;
   const firstMeal = nutrition.data.weekly_meal_plan[0];
+  const allResults = [farmer, trace, nutrition, product, scanner, farms, rewards, health, dna, soil, waste, scores, consultation, delivery, cart, order];
+  const usingDemoData = allResults.some((result) => result.success === false);
 
   return (
     <main>
@@ -170,6 +172,12 @@ export default async function Home() {
           <p>Operations cockpit</p>
           <h2>Live platform modules</h2>
         </div>
+
+        {usingDemoData && (
+          <p className="demoBanner">
+            Showing preview/demo values for modules that need a signed-in session or seeded data (nutrition AI, DNA diet, scanner, soil, waste, consultations, and similar future/optional integrations). Sign in and use the marketplace, cart, and orders for real, database-backed data.
+          </p>
+        )}
 
         <div className="metricGrid">
           <Metric icon={<Utensils />} label="Daily target" value={`${dailyCalories} kcal`} detail="Personalized for diabetes and hypertension" />

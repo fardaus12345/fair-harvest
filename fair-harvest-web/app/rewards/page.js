@@ -15,11 +15,12 @@ const badges = [
 
 export default function RewardsPage() {
   const { user, loading: sessionLoading } = useSession();
-  const [rewards, setRewards] = useState({ points: 1240, streak_days: 9, badges: ["Organic Warrior", "7-Day Streak"] });
+  const [rewards, setRewards] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (sessionLoading || !user) return;
-    getRewards(user.id).then(setRewards).catch(() => null);
+    getRewards(user.id).then(setRewards).catch((err) => setError(err.message || "Could not load rewards"));
   }, [sessionLoading, user]);
 
   if (!sessionLoading && !user) {
@@ -33,15 +34,25 @@ export default function RewardsPage() {
     );
   }
 
-  const next = badges.find((badge) => badge.points > (rewards.points || rewards.reward_points)) || badges[badges.length - 1];
-  const points = rewards.points || rewards.reward_points || 0;
+  if (!rewards) {
+    return (
+      <main className="appPage">
+        <div className="toolPanel">
+          <p className="muted">{error || "Loading your rewards..."}</p>
+        </div>
+      </main>
+    );
+  }
+
+  const points = rewards.points || 0;
+  const next = badges.find((badge) => badge.points > points) || badges[badges.length - 1];
 
   return (
     <main className="appPage">
       <header className="pageHeader"><div><p className="eyebrow">Rewards</p><h1>Healthy habits earn marketplace benefits.</h1></div></header>
       <section className="metricGrid compact">
         <article className="metric"><Coins /><span>Total points</span><strong>{points}</strong></article>
-        <article className="metric"><Flame /><span>Streak</span><strong>{rewards.streak_days || rewards.healthy_order_streak_days} days</strong></article>
+        <article className="metric"><Flame /><span>Distinct active days</span><strong>{rewards.streak_days} days</strong></article>
         <article className="metric"><span>Next badge</span><strong>{next.name}</strong></article>
       </section>
       <section className="toolPanel">
@@ -51,7 +62,18 @@ export default function RewardsPage() {
       </section>
       <section className="toolPanel">
         <h2>Recent activity</h2>
-        <div className="resultStack"><div className="splitLine"><span>Healthy purchase</span><strong>+20</strong></div><div className="splitLine"><span>Product scan</span><strong>+5</strong></div><div className="splitLine"><span>Meal log</span><strong>+8</strong></div></div>
+        {rewards.recent_activity && rewards.recent_activity.length > 0 ? (
+          <div className="resultStack">
+            {rewards.recent_activity.map((entry, index) => (
+              <div className="splitLine" key={`${entry.created_at}-${index}`}>
+                <span>{entry.reason}</span>
+                <strong>+{entry.points}</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">No rewards activity yet — points are earned from real completed purchases.</p>
+        )}
       </section>
     </main>
   );

@@ -82,6 +82,11 @@ enum TraceStage {
   LISTED
 }
 
+enum ReviewStatus {
+  PUBLISHED
+  HIDDEN
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -98,6 +103,8 @@ model User {
   orders          Order[]
   rewardsLedger   RewardsLedger[]
   verifiedFarmers FarmerProfile[] @relation("VerifiedByAdmin")
+  reviews         Review[]
+  wishlistItems   WishlistItem[]
 
   @@index([role])
 }
@@ -154,6 +161,8 @@ model Product {
   cartItems  CartItem[]
   orderItems OrderItem[]
   traceEvents TraceEvent[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
 
   @@index([category])
   @@index([status])
@@ -214,6 +223,8 @@ model OrderItem {
   unitPriceBdt  Float
   lineTotalBdt  Float
 
+  review Review?
+
   @@index([farmerId])
 }
 
@@ -256,5 +267,42 @@ model RewardsLedger {
   reason    String
   createdAt DateTime @default(now())
 
+  @@index([userId])
+}
+
+// A review is only createable server-side once we've verified the customer
+// has a DELIVERED order item for this exact product (see lib/server/reviews.js).
+// orderItemId is unique so that specific purchase can only be reviewed once;
+// the (customerId, productId) unique guard also blocks review-farming across
+// multiple orders of the same product by the same customer.
+model Review {
+  id          String       @id @default(cuid())
+  customerId  String
+  customer    User         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  farmerId    String
+  orderItemId String       @unique
+  orderItem   OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  rating      Int
+  comment     String?
+  status      ReviewStatus @default(PUBLISHED)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([customerId, productId])
+  @@index([productId])
+  @@index([farmerId])
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
   @@index([userId])
 }

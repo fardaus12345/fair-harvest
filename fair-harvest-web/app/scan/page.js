@@ -37,8 +37,9 @@ export default function ScanPage() {
       const nextHistory = [{ ...data, product_name: productName, at: new Date().toISOString() }, ...history].slice(0, 3);
       setHistory(nextHistory);
       window.localStorage.setItem("scanHistory", JSON.stringify(nextHistory));
-    } catch {
-      setResult({ freshness_score: 84, chemical_risk_score: 18, recommendation: "Looks safe to consume within two days." });
+    } catch (err) {
+      setError(err.message || "Could not analyze this image right now — please try again.");
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -57,6 +58,7 @@ export default function ScanPage() {
   return (
     <main className="appPage">
       <header className="pageHeader"><div><p className="eyebrow">Smart scanner</p><h1>Analyze freshness and chemical risk from camera or upload.</h1></div></header>
+      <p className="demoBanner">Demo/heuristic analysis — this does not use a real computer-vision or AI image model. The score is generated from the product name only, not from the actual photo, and is for demonstration purposes.</p>
       <section className="formGrid">
         <div className="toolPanel">
           <div className="tabs"><button className={tab === "camera" ? "active" : ""} onClick={() => { setTab("camera"); startCamera(); }}><Camera size={16} /> Camera scan</button><button className={tab === "upload" ? "active" : ""} onClick={() => setTab("upload")}><ImagePlus size={16} /> Upload image</button></div>
@@ -64,7 +66,7 @@ export default function ScanPage() {
           {error ? <p className="muted">{error}</p> : null}
           {tab === "camera" ? <div className="scannerFrame"><video ref={videoRef} autoPlay muted playsInline /><span /></div> : <label className="dropZone">Drop or choose image<input type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = () => setPreview(reader.result); reader.readAsDataURL(file); } }} /></label>}
           {preview ? <img className="previewImage" src={preview} alt="Uploaded produce preview" /> : null}
-          <div className="actionRow"><button onClick={tab === "camera" ? capture : () => runAnalyze()}>{loading ? "AI is analyzing..." : "Analyze this image"}</button><button onClick={() => { setResult(null); setPreview(""); }}><RotateCcw size={16} /> Scan again</button></div>
+          <div className="actionRow"><button onClick={tab === "camera" ? capture : () => runAnalyze()} disabled={loading}>{loading ? "Analyzing..." : "Analyze this image"}</button><button onClick={() => { setResult(null); setPreview(""); setError(""); }}><RotateCcw size={16} /> Scan again</button></div>
         </div>
         <div className="toolPanel">
           {result ? <Results result={result} /> : <p className="muted">Scan results will appear here.</p>}
@@ -78,5 +80,12 @@ export default function ScanPage() {
 
 function Results({ result }) {
   const tone = result.freshness_score >= 80 ? "good" : result.freshness_score >= 60 ? "warn" : "bad";
-  return <div className="resultStack"><span className={`badge ${tone}`}>{result.freshness_score}% freshness</span><div className="scoreRow"><div><span>Chemical risk</span><strong>{result.chemical_risk_score}%</strong></div><div className="bar"><span style={{ width: `${100 - result.chemical_risk_score}%` }} /></div></div><p className="strong">{result.recommendation}</p><div className="actionRow"><button>Add to cart</button><button>Report product</button></div></div>;
+  return (
+    <div className="resultStack">
+      <span className={`badge ${tone}`}>{result.freshness_score}% freshness (demo)</span>
+      <div className="scoreRow"><div><span>Chemical risk</span><strong>{result.chemical_risk_score}%</strong></div><div className="bar"><span style={{ width: `${100 - result.chemical_risk_score}%` }} /></div></div>
+      <p className="strong">{result.recommendation}</p>
+      <div className="actionRow"><a className="ghostButton" href="/marketplace">Browse marketplace</a></div>
+    </div>
+  );
 }
