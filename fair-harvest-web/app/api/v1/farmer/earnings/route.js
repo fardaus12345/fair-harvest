@@ -1,7 +1,7 @@
-import { prisma } from "../../../../lib/server/db.js";
-import { requireUser } from "../../../../lib/server/auth.js";
-import { ok, handleRoute, ApiError } from "../../../../lib/server/respond.js";
-import { summarizeEarnings } from "../../../../lib/server/earnings.js";
+import { prisma } from "../../../../../lib/server/db.js";
+import { requireUser } from "../../../../../lib/server/auth.js";
+import { ok, handleRoute, ApiError } from "../../../../../lib/server/respond.js";
+import { summarizeEarnings } from "../../../../../lib/server/earnings.js";
 
 export async function GET(request) {
   return handleRoute(async () => {
