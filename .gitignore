@@ -6,3 +6,7 @@ node_modules/
 .DS_Store
 *.db
 *.db-journal
+
+# Leftover JSON-DB snapshot from the earlier prototype (main branch) — not
+# part of this Prisma-based app, kept locally but not tracked.
+fair-harvest-web/data/
