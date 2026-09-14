@@ -3,12 +3,13 @@ import { prisma } from "../../../../../../lib/server/db.js";
 import { requireRole } from "../../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../../lib/server/respond.js";
 import { toAdminFarmer } from "../../../../../../lib/server/serializers.js";
+import { recordAudit } from "../../../../../../lib/server/audit.js";
 
 const patchSchema = z.object({ account_status: z.enum(["active", "suspended"]) });
 
 export async function PATCH(request, { params }) {
   return handleRoute(async () => {
-    requireRole(request, ["ADMIN"]);
+    const session = requireRole(request, ["ADMIN"]);
     const { farmerId } = await params;
 
     const profile = await prisma.farmerProfile.findUnique({ where: { id: farmerId } });
@@ -23,6 +24,15 @@ export async function PATCH(request, { params }) {
     const updated = await prisma.farmerProfile.findUnique({
       where: { id: farmerId },
       include: { user: true, _count: { select: { products: true } } }
+    });
+
+    await recordAudit({
+      actorId: session.userId,
+      actorRole: session.role,
+      action: "farmer_status_updated",
+      targetType: "FarmerProfile",
+      targetId: farmerId,
+      metadata: { account_status: parsed.data.account_status }
     });
 
     return ok({ farmer: toAdminFarmer(updated) }, { message: "Farmer updated" });

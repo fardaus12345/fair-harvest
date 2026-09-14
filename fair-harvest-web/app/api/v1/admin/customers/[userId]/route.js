@@ -3,12 +3,13 @@ import { prisma } from "../../../../../../lib/server/db.js";
 import { requireRole } from "../../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../../lib/server/respond.js";
 import { toAdminCustomer } from "../../../../../../lib/server/serializers.js";
+import { recordAudit } from "../../../../../../lib/server/audit.js";
 
 const patchSchema = z.object({ status: z.enum(["active", "suspended"]) });
 
 export async function PATCH(request, { params }) {
   return handleRoute(async () => {
-    requireRole(request, ["ADMIN"]);
+    const session = requireRole(request, ["ADMIN"]);
     const { userId } = await params;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -22,6 +23,15 @@ export async function PATCH(request, { params }) {
       where: { id: userId },
       data: { status: parsed.data.status.toUpperCase() },
       include: { _count: { select: { orders: true } } }
+    });
+
+    await recordAudit({
+      actorId: session.userId,
+      actorRole: session.role,
+      action: "customer_status_updated",
+      targetType: "User",
+      targetId: userId,
+      metadata: { status: parsed.data.status }
     });
 
     return ok({ customer: toAdminCustomer(updated) }, { message: "Customer updated" });

@@ -3,6 +3,7 @@ import { prisma } from "../../../../../../lib/server/db.js";
 import { requireRole } from "../../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../../lib/server/respond.js";
 import { recomputeFarmerReputation } from "../../../../../../lib/server/reputationSync.js";
+import { recordAudit } from "../../../../../../lib/server/audit.js";
 
 const updateSchema = z.object({ status: z.enum(["published", "hidden"]) });
 
@@ -10,7 +11,7 @@ const updateSchema = z.object({ status: z.enum(["published", "hidden"]) });
 // hiding just removes it from public reviews.js GET queries (status filter).
 export async function PATCH(request, { params }) {
   return handleRoute(async () => {
-    requireRole(request, ["ADMIN"]);
+    const session = requireRole(request, ["ADMIN"]);
     const { reviewId } = await params;
 
     const body = await request.json().catch(() => ({}));
@@ -26,6 +27,15 @@ export async function PATCH(request, { params }) {
     });
 
     await recomputeFarmerReputation(updated.farmerId);
+
+    await recordAudit({
+      actorId: session.userId,
+      actorRole: session.role,
+      action: "review_moderated",
+      targetType: "Review",
+      targetId: reviewId,
+      metadata: { status: parsed.data.status }
+    });
 
     return ok({ review_id: updated.id, status: updated.status.toLowerCase() }, { message: "Review updated" });
   });

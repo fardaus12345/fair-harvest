@@ -136,13 +136,17 @@ export function moderateReview(reviewId, status) {
   return request(`/admin/reviews/${reviewId}`, { method: "PATCH", body: JSON.stringify({ status }) });
 }
 
+export function getAdminAuditLog() {
+  return request("/admin/audit-log");
+}
+
 export function getFarmerScore(farmerId) {
   return request(`/farmers/${farmerId}/score`);
 }
 
 export function getNearbyFarmers(filters) {
   const query = new URLSearchParams(filters);
-  return request(`/farmers/nearby?${query.toString()}`);
+  return request(`/farms/nearby?${query.toString()}`);
 }
 
 export function uploadVoice(audioBase64, farmerId = "f001") {

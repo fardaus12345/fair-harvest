@@ -2,6 +2,7 @@ import { prisma } from "../../../../../../../../lib/server/db.js";
 import { requireRole } from "../../../../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../../../../lib/server/respond.js";
 import { toAdminFarmer } from "../../../../../../../../lib/server/serializers.js";
+import { recordAudit } from "../../../../../../../../lib/server/audit.js";
 
 export async function POST(request, { params }) {
   return handleRoute(async () => {
@@ -20,6 +21,14 @@ export async function POST(request, { params }) {
         verifiedByAdminId: session.userId
       },
       include: { user: true, _count: { select: { products: true } } }
+    });
+
+    await recordAudit({
+      actorId: session.userId,
+      actorRole: session.role,
+      action: "farmer_verification_approved",
+      targetType: "FarmerProfile",
+      targetId: farmerId
     });
 
     return ok({ farmer: toAdminFarmer(updated) }, { message: "Farmer verified" });

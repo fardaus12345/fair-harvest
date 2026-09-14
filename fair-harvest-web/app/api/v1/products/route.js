@@ -34,7 +34,6 @@ export async function GET(request) {
 }
 
 const createProductSchema = z.object({
-  product_id: z.string().min(1).optional(),
   farmer_id: z.string().min(1, "farmer_id is required"),
   name: z.string().min(1, "Product name is required"),
   category: z.enum(CATEGORIES),
@@ -64,7 +63,6 @@ export async function POST(request) {
 
     const product = await prisma.product.create({
       data: {
-        ...(data.product_id ? { id: data.product_id } : {}),
         farmerId: data.farmer_id,
         name: data.name,
         category: data.category,

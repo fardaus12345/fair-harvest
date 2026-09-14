@@ -306,3 +306,21 @@ model WishlistItem {
   @@unique([userId, productId])
   @@index([userId])
 }
+
+// Lightweight admin audit trail. Deliberately no foreign keys to User/Product
+// etc: an audit record must survive even if the target row is later deleted,
+// so actor/target ids are stored as plain snapshot strings, matching the
+// existing denormalized-id convention used elsewhere (e.g. OrderItem.farmerId).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String
+  action     String
+  targetType String
+  targetId   String
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}

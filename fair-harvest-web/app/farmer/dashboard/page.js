@@ -30,7 +30,7 @@ export default function FarmerDashboard() {
 
   async function addProduct(event) {
     event.preventDefault();
-    const product = await createProduct({ product_id: `product-${Date.now()}`, farmer_id: farmerId, freshness_window_days: 2, status: "active", ...draft });
+    const product = await createProduct({ farmer_id: farmerId, freshness_window_days: 2, status: "active", ...draft });
     setProducts([product, ...products]);
   }
 
