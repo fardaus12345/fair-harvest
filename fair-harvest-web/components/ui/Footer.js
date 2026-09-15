@@ -1,4 +1,4 @@
-import { Leaf } from "lucide-react";
+import BrandLogo from "./BrandLogo.js";
 
 const footerLinks = [
   { href: "/marketplace", label: "Marketplace" },
@@ -14,9 +14,8 @@ export default function Footer() {
     <footer className="globalFooter">
       <div className="footerInner">
         <div className="footerBrand">
-          <Leaf size={22} />
           <div>
-            <strong>Fair Harvest</strong>
+            <BrandLogo />
             <span>AI-powered organic food and health ecosystem</span>
           </div>
         </div>

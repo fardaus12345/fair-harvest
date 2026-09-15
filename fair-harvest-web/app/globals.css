@@ -111,6 +111,24 @@ svg {
 
 .brand {
   min-height: 44px;
+  /* The old brand was icon + text, which had a min-content width floor. An
+     image has none, so without this the logo is squeezed to a sliver when the
+     header row gets tight. */
+  flex: 0 0 auto;
+}
+
+/* The logo is a 3:1 wordmark. Only the height is set anywhere; width stays
+   auto so the artwork keeps its aspect ratio and is never stretched. */
+.brandLogo {
+  display: block;
+  height: 32px;
+  width: auto;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+.footerBrand .brandLogo {
+  height: 30px;
 }
 
 .navStatus {
@@ -1292,6 +1310,10 @@ select {
     min-width: 42px;
     padding-inline: 8px;
     font-size: 12px;
+  }
+
+  .brandLogo {
+    height: 28px;
   }
 
   .hamburger {

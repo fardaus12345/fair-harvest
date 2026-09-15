@@ -1,7 +1,8 @@
 "use client";
 
-import { Leaf, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import LanguageToggle from "../i18n/LanguageToggle.js";
+import BrandLogo from "./BrandLogo.js";
 import { useSession, clearSession } from "../auth/useSession.js";
 
 const baseLinks = [
@@ -23,8 +24,7 @@ export default function Navbar() {
     <header className="globalHeader">
       <nav className="topbar" aria-label="Main navigation">
       <a className="brand" href="/">
-        <Leaf size={22} />
-        <span>Fair Harvest</span>
+        <BrandLogo />
       </a>
 
       <div className="desktopNav">
