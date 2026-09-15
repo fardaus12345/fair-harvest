@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pencil, Search } from "lucide-react";
 import { getAdminProducts, updateProduct, archiveProduct } from "../../../lib/api.js";
 import ProductImage from "../../../components/products/ProductImage.js";
@@ -26,8 +26,16 @@ export default function AdminProductsPage() {
       .finally(() => setLoading(false));
   }, [filters]);
 
-  // Debounced so typing in the search box does not fire a request per keystroke.
+  // Typing in the search box is debounced so it does not fire a request per
+  // keystroke, but the first load runs straight away: making the page wait
+  // 250ms before it even asks for data just delays the table for no reason.
+  const firstLoad = useRef(true);
   useEffect(() => {
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      load();
+      return;
+    }
     const timer = setTimeout(load, 250);
     return () => clearTimeout(timer);
   }, [load]);
