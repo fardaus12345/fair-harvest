@@ -33,7 +33,7 @@ export default function OrdersPage() {
       <main className="appPage">
         <div className="toolPanel">
           <p className="muted">Log in to see your order history.</p>
-          <a className="commandButton" href="/auth">Go to login</a>
+          <a className="commandButton" href="/auth/customer">Go to login</a>
         </div>
       </main>
     );

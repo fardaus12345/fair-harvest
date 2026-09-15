@@ -35,7 +35,7 @@ export async function PATCH(request, { params }) {
         status: nextStatus,
         statusEvents: { create: { status: nextStatus, note: parsed.data.note } }
       },
-      include: { items: true, statusEvents: true }
+      include: { items: { include: { product: true } }, statusEvents: true }
     });
 
     if (nextStatus === "DELIVERED" || nextStatus === "CANCELLED") {

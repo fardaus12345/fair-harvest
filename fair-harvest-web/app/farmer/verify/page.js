@@ -39,7 +39,7 @@ export default function FarmerVerifyPage() {
       <main className="appPage">
         <div className="toolPanel">
           <p className="muted">Log in as a farmer to verify your Farmer Card.</p>
-          <a className="commandButton" href="/auth">Go to login</a>
+          <a className="commandButton" href="/auth/farmer">Go to login</a>
         </div>
       </main>
     );

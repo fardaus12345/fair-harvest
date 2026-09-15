@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mic, QrCode, Star } from "lucide-react";
+import { Mic, Star } from "lucide-react";
 import { addTraceEvent, createProduct, getFarmerEarnings, getFarmerOrders, getFarmerScore, getProducts, uploadVoice } from "../../../lib/api.js";
 import { useSession } from "../../../components/auth/useSession.js";
+import ProductImageUploader from "../../../components/products/ProductImageUploader.js";
+import FarmerProductRow from "../../../components/products/FarmerProductRow.js";
+import ProductImage from "../../../components/products/ProductImage.js";
 
 export default function FarmerDashboard() {
   const { user: sessionUser, loading: sessionLoading } = useSession();
@@ -18,7 +21,7 @@ export default function FarmerDashboard() {
   const [earnings, setEarnings] = useState(null);
   const [listedStatus, setListedStatus] = useState({});
   const [voice, setVoice] = useState(null);
-  const [draft, setDraft] = useState({ name: "", category: "vegetable", price_bdt: 100, quantity_kg: 10 });
+  const [draft, setDraft] = useState({ name: "", category: "vegetable", price_bdt: 100, quantity_kg: 10, image_url: null });
 
   useEffect(() => {
     if (sessionLoading || !farmerId) return;
@@ -30,10 +33,16 @@ export default function FarmerDashboard() {
     }
   }, [sessionLoading, farmerId, sessionUser]);
 
+  function reloadProducts() {
+    if (!farmerId) return;
+    getProducts({ farmer_id: farmerId }).then((data) => setProducts(data.products || [])).catch(() => null);
+  }
+
   async function addProduct(event) {
     event.preventDefault();
-    const product = await createProduct({ farmer_id: farmerId, freshness_window_days: 2, status: "active", ...draft });
-    setProducts([product, ...products]);
+    await createProduct({ farmer_id: farmerId, freshness_window_days: 2, status: "active", ...draft });
+    setDraft({ name: "", category: "vegetable", price_bdt: 100, quantity_kg: 10, image_url: null });
+    reloadProducts();
   }
 
   async function markListed(productId) {
@@ -73,16 +82,13 @@ export default function FarmerDashboard() {
           <div className="splitLine"><h2>My products</h2></div>
           <div className="dataTable">
             {products.map((product) => (
-              <div key={product.product_id}>
-                <span>{product.name}</span>
-                <span>{product.category}</span>
-                <span>{product.price_bdt} BDT</span>
-                <span>{product.quantity_kg} kg</span>
-                <span>{product.trust_score}%</span>
-                <button type="button" onClick={() => markListed(product.product_id)} disabled={listedStatus[product.product_id] === "saving"}>
-                  <QrCode size={14} /> {listedStatus[product.product_id] === "done" ? "Marked listed" : listedStatus[product.product_id] === "error" ? "Try again" : "Mark as listed"}
-                </button>
-              </div>
+              <FarmerProductRow
+                key={product.product_id}
+                product={product}
+                onChanged={reloadProducts}
+                onMarkListed={markListed}
+                listedStatus={listedStatus[product.product_id]}
+              />
             ))}
             {products.length === 0 && <p className="muted">No products yet — add one to get started.</p>}
           </div>
@@ -90,6 +96,11 @@ export default function FarmerDashboard() {
         {isVerified ? (
           <form className="toolPanel" onSubmit={addProduct}>
             <h2>Add product</h2>
+            <ProductImageUploader
+              value={draft.image_url}
+              onChange={(url) => setDraft({ ...draft, image_url: url })}
+              category={draft.category}
+            />
             <label>Name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
             <label>Category<select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })}><option value="vegetable">Vegetable</option><option value="fruit">Fruit</option><option value="grain">Grain</option></select></label>
             <label>Price<input type="number" value={draft.price_bdt} onChange={(event) => setDraft({ ...draft, price_bdt: Number(event.target.value) })} /></label>
@@ -103,6 +114,7 @@ export default function FarmerDashboard() {
           <div className="dataTable">
             {orders.slice(0, 8).map((item) => (
               <div key={item.order_item_id}>
+                <ProductImage src={item.image_url} alt={item.product_name} size="thumb" />
                 <span>{item.product_name}</span>
                 <span>{item.quantity_kg} kg</span>
                 <span>{item.line_total_bdt} BDT</span>

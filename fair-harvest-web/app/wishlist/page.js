@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getWishlist, removeFromWishlist } from "../../lib/api.js";
 import { useSession } from "../../components/auth/useSession.js";
+import ProductImage from "../../components/products/ProductImage.js";
 
 export default function WishlistPage() {
   const { user, loading: sessionLoading } = useSession();
@@ -35,7 +36,7 @@ export default function WishlistPage() {
       <main className="appPage">
         <div className="toolPanel">
           <p className="muted">Log in to see your wishlist.</p>
-          <a className="commandButton" href="/auth">Go to login</a>
+          <a className="commandButton" href="/auth/customer">Go to login</a>
         </div>
       </main>
     );
@@ -50,6 +51,7 @@ export default function WishlistPage() {
         <div className="cardGrid">
           {items.map((item) => (
             <article className="productCard" key={item.wishlist_item_id}>
+              <ProductImage src={item.product.image_url} alt={item.product.name} category={item.product.category} />
               <div className="splitLine"><h2><a href={`/marketplace/${item.product.product_id}`}>{item.product.name}</a></h2><span className="badge">{item.product.trust_score}%</span></div>
               <p className="muted">{item.product.farmer_name || "Fair Harvest farmer"}</p>
               <div className="splitLine"><strong>{item.product.price_bdt} BDT/kg</strong><button className="ghostButton" onClick={() => remove(item.product.product_id)}>Remove</button></div>

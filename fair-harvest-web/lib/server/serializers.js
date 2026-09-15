@@ -38,6 +38,7 @@ export function toPublicCart(userId, cart) {
     cart_item_id: item.id,
     product_id: item.productId,
     name: item.product.name,
+    image_url: item.product.imageUrl || null,
     price_bdt: item.unitPriceBdt,
     quantity_kg: item.quantityKg,
     source: item.source.toLowerCase(),
@@ -63,6 +64,7 @@ export function toPublicOrder(order) {
       product_id: item.productId,
       farmer_id: item.farmerId,
       name: item.nameSnapshot,
+      image_url: item.product?.imageUrl || null,
       quantity_kg: item.quantityKg,
       unit_price_bdt: item.unitPriceBdt,
       line_total_bdt: item.lineTotalBdt

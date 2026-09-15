@@ -31,7 +31,7 @@ export function useCart() {
 
   async function addItem(productId, quantityKg = 1, source = "direct") {
     if (!user) {
-      window.location.href = "/auth";
+      window.location.href = "/auth/customer";
       return;
     }
     await addCartItem(user.id, { product_id: productId, quantity_kg: quantityKg, source });

@@ -67,8 +67,35 @@ export function rejectFarmerVerification(farmerId) {
   return request(`/admin/farmers/${farmerId}/verification/reject`, { method: "POST" });
 }
 
-export function getAdminProducts() {
-  return request("/admin/products");
+export function getAdminProducts(filters = {}) {
+  const query = new URLSearchParams(
+    Object.entries(filters).filter(([, value]) => value !== "" && value !== undefined && value !== null)
+  );
+  const suffix = query.toString();
+  return request(`/admin/products${suffix ? `?${suffix}` : ""}`);
+}
+
+export function archiveProduct(productId) {
+  return request(`/products/${productId}`, { method: "DELETE" });
+}
+
+// Uploads a product image and resolves to { image_url }. Sent as multipart form
+// data, so the shared JSON request helper is not used here; the bearer token is
+// attached the same way.
+export async function uploadProductImage(file) {
+  const body = new FormData();
+  body.append("file", file);
+
+  const headers = {};
+  if (typeof window !== "undefined") {
+    const token = window.localStorage.getItem("fairHarvestToken");
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_ROOT}/uploads/product-image`, { method: "POST", headers, body });
+  const payload = await response.json().catch(() => ({ success: false, message: "Upload failed" }));
+  if (!response.ok) throw new Error(payload.message || "Upload failed");
+  return payload.data;
 }
 
 export function getAdminCustomers() {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "../../../components/auth/useSession.js";
 import StatusTimeline from "../../../components/orders/StatusTimeline.js";
 import { getOrderDetail } from "../../../lib/api.js";
+import ProductImage from "../../../components/products/ProductImage.js";
 
 export default function OrderDetailPage({ params }) {
   const { user, loading: sessionLoading } = useSession();
@@ -37,7 +38,7 @@ export default function OrderDetailPage({ params }) {
       <main className="appPage">
         <div className="toolPanel">
           <p className="muted">Log in to view this order.</p>
-          <a className="commandButton" href="/auth">Go to login</a>
+          <a className="commandButton" href="/auth/customer">Go to login</a>
         </div>
       </main>
     );
@@ -69,7 +70,10 @@ export default function OrderDetailPage({ params }) {
           <div className="resultStack">
             {order.items.map((item) => (
               <div className="splitLine" key={item.product_id}>
-                <span>{item.name} · {item.quantity_kg} kg</span>
+                <span className="orderItemLine">
+                  <ProductImage src={item.image_url} alt={item.name} size="thumb" />
+                  {item.name} · {item.quantity_kg} kg
+                </span>
                 <strong>{item.line_total_bdt} BDT</strong>
               </div>
             ))}

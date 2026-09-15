@@ -28,7 +28,7 @@ export default function RewardsPage() {
       <main className="appPage">
         <div className="toolPanel">
           <p className="muted">Log in to see your rewards.</p>
-          <a className="commandButton" href="/auth">Go to login</a>
+          <a className="commandButton" href="/auth/customer">Go to login</a>
         </div>
       </main>
     );

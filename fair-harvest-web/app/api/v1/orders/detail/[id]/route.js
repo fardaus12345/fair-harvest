@@ -10,7 +10,7 @@ export async function GET(request, { params }) {
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true, statusEvents: true, payment: true }
+      include: { items: { include: { product: true } }, statusEvents: true, payment: true }
     });
     if (!order) throw new ApiError("Order not found", 404);
     if (session.role !== "ADMIN" && session.userId !== order.userId) {

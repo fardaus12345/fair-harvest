@@ -3,6 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { useCart } from "../../components/cart/useCart.js";
 import { useSession } from "../../components/auth/useSession.js";
+import ProductImage from "../../components/products/ProductImage.js";
 
 export default function CartPage() {
   const { user, loading: sessionLoading } = useSession();
@@ -21,7 +22,7 @@ export default function CartPage() {
       <main className="appPage">
         <div className="toolPanel">
           <p className="muted">Log in to view your cart.</p>
-          <a className="commandButton" href="/auth">Go to login</a>
+          <a className="commandButton" href="/auth/customer">Go to login</a>
         </div>
       </main>
     );
@@ -44,6 +45,7 @@ export default function CartPage() {
           <div className="dataTable">
             {cart.items.map((item) => (
               <div key={item.cart_item_id}>
+                <ProductImage src={item.image_url} alt={item.name} size="thumb" />
                 <span>{item.name}</span>
                 <span>{item.price_bdt} BDT/kg</span>
                 <input

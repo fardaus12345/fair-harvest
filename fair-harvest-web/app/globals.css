@@ -1618,3 +1618,140 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------
+   Product images
+   The .produceTile gradient block is kept as the no-photo fallback;
+   .productPhoto reuses the same box so a real photo drops straight
+   into the existing card layout without changing any surrounding
+   spacing.
+   --------------------------------------------------------------- */
+.productPhoto {
+  object-fit: cover;
+  width: 100%;
+  display: block;
+  background: linear-gradient(135deg, #dff3e4, #f5e7bc);
+}
+
+.produceTileThumb {
+  height: 52px;
+  width: 52px;
+  min-width: 52px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+.orderItemLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- image uploader --- */
+.imageUploader {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.imageUploaderLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft, #55655a);
+}
+
+.imageUploader .imageUploaderPreview {
+  height: 160px;
+  width: 100%;
+}
+
+.imageUploaderHint {
+  font-size: 12px;
+}
+
+.imageUploader .actionRow {
+  gap: 8px;
+}
+
+.productEditForm {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+/* --- role-separated auth pages --- */
+.authColumn {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 18px;
+}
+
+.authHeading h1 {
+  margin: 6px 0 8px;
+}
+
+.authHeading .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.authSwitch {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.authChooser {
+  width: min(620px, 100%);
+}
+
+.authDoor {
+  display: block;
+  text-decoration: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.authDoor:hover {
+  transform: translateY(-2px);
+}
+
+.authDoor h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+  .imageUploader .imageUploaderPreview {
+    height: 140px;
+  }
+}
+
+/* Product rows carry a thumbnail plus two actions, so they need their own
+   column template rather than the generic six-column .dataTable row. */
+.dataTable > div.productRow {
+  grid-template-columns: 52px minmax(140px, 1.4fr) minmax(100px, 1fr) 0.8fr 0.7fr 0.8fr auto auto;
+}
+
+/* Keep the admin search box from collapsing next to the two filter selects. */
+.marketToolbar .searchBox {
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.marketToolbar select {
+  flex: 0 1 190px;
+}
+
+@media (max-width: 900px) {
+  .dataTable > div.productRow {
+    grid-template-columns: 52px 1fr auto;
+  }
+}
+
+.dataTable > div.productRow .badge {
+  justify-self: start;
+}

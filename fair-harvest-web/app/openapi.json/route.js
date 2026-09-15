@@ -21,6 +21,11 @@ const spec = {
       delete: { summary: "Archive a product (owner or admin)", tags: ["products"] }
     },
     "/products/{productId}/scores": { get: { summary: "Get eco/health/pesticide scores for a product", tags: ["products"] } },
+    "/uploads/product-image": {
+      post: { summary: "Upload a product image (verified farmer or admin); returns image_url", tags: ["uploads"] },
+      get: { summary: "Get the accepted image types and size limit", tags: ["uploads"] }
+    },
+    "/uploads/{key}": { get: { summary: "Serve a stored image (local storage provider only)", tags: ["uploads"] } },
     "/cart/{userId}": {
       get: { summary: "Get a user's cart", tags: ["cart"] },
       delete: { summary: "Clear a user's cart", tags: ["cart"] }
@@ -42,7 +47,7 @@ const spec = {
     "/admin/farmers/verifications": { get: { summary: "List pending Farmer Card verifications", tags: ["admin"] } },
     "/admin/farmers/{farmerId}/verification/approve": { post: { summary: "Manually approve a farmer's verification", tags: ["admin"] } },
     "/admin/farmers/{farmerId}/verification/reject": { post: { summary: "Reject a farmer's verification", tags: ["admin"] } },
-    "/admin/products": { get: { summary: "List all products (any status)", tags: ["admin"] } },
+    "/admin/products": { get: { summary: "List all products with search, category and status filters", tags: ["admin"] } },
     "/admin/customers": { get: { summary: "List all customers", tags: ["admin"] } },
     "/admin/customers/{userId}": { patch: { summary: "Suspend or reinstate a customer's account", tags: ["admin"] } },
     "/admin/orders": { get: { summary: "List all orders", tags: ["admin"] } },

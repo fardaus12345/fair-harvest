@@ -16,7 +16,10 @@ export async function GET(request) {
 
     const items = await prisma.orderItem.findMany({
       where: { farmerId: farmerProfile.id },
-      include: { order: { select: { id: true, status: true, createdAt: true, deliveryLine1: true, deliveryCity: true, user: { select: { name: true } } } } },
+      include: {
+        product: { select: { imageUrl: true } },
+        order: { select: { id: true, status: true, createdAt: true, deliveryLine1: true, deliveryCity: true, user: { select: { name: true } } } }
+      },
       orderBy: { id: "desc" }
     });
 
@@ -26,6 +29,7 @@ export async function GET(request) {
         order_id: item.orderId,
         product_id: item.productId,
         product_name: item.nameSnapshot,
+        image_url: item.product?.imageUrl || null,
         quantity_kg: item.quantityKg,
         line_total_bdt: item.lineTotalBdt,
         order_status: item.order.status.toLowerCase(),

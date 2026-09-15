@@ -3,6 +3,7 @@ import { getProduct } from "../../../lib/api.js";
 import AddToCartButton from "../../../components/cart/AddToCartButton.js";
 import WishlistButton from "../../../components/wishlist/WishlistButton.js";
 import ReviewsSection from "../../../components/reviews/ReviewsSection.js";
+import ProductImage from "../../../components/products/ProductImage.js";
 
 export default async function ProductDetailPage({ params }) {
   const { productId } = await params;
@@ -34,9 +35,12 @@ export default async function ProductDetailPage({ params }) {
 
       <section className="traceGrid">
         <article className="toolPanel">
-          <div className="produceTile" style={{ height: 220 }}>
-            {product.category === "fruit" ? "Fruit" : "Fresh"}
-          </div>
+          <ProductImage
+            src={product.image_url}
+            alt={product.name}
+            category={product.category}
+            style={{ height: 260 }}
+          />
         </article>
 
         <article className="toolPanel">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { getProducts } from "../../lib/api.js";
 import AddToCartButton from "../../components/cart/AddToCartButton.js";
+import ProductImage from "../../components/products/ProductImage.js";
 
 const fallbackProducts = [
   { product_id: "abc123", name: "Organic Spinach", category: "vegetable", farmer_id: "f001", trust_score: 88, freshness_window_days: 2, price_bdt: 120, status: "active" },
@@ -68,7 +69,7 @@ export default function MarketplacePage() {
           <div className="cardGrid">
             {visibleProducts.map((product) => (
               <article className="productCard" key={product.product_id}>
-                <div className="produceTile">{product.category === "fruit" ? "Fruit" : "Fresh"}</div>
+                <ProductImage src={product.image_url} alt={product.name} category={product.category} />
                 <div className="splitLine"><h2><a href={`/marketplace/${product.product_id}`}>{product.name}</a></h2><span className={product.trust_score > 80 ? "badge good" : "badge warn"}>{product.trust_score}%</span></div>
                 <p className="muted">{product.farmer_name ? `${product.farmer_name} · ${product.farmer_district || "Bangladesh"}` : `Farm ${product.farmer_id} · Dhaka district`}</p>
                 <div className="bar"><span style={{ width: `${Math.min(100, product.freshness_window_days * 30)}%` }} /></div>

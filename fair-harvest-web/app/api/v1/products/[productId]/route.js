@@ -3,6 +3,7 @@ import { prisma } from "../../../../../lib/server/db.js";
 import { requireUser } from "../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../lib/server/respond.js";
 import { toPublicProduct } from "../../../../../lib/server/serializers.js";
+import { deleteObject, storageKeyFromUrl } from "../../../../../lib/server/storage/index.js";
 
 async function loadProduct(productId) {
   const product = await prisma.product.findUnique({
@@ -34,7 +35,11 @@ const updateProductSchema = z.object({
   price_bdt: z.coerce.number().positive().optional(),
   quantity_kg: z.coerce.number().nonnegative().optional(),
   freshness_window_days: z.coerce.number().int().positive().optional(),
-  status: z.enum(["active", "out_of_stock", "archived"]).optional()
+  status: z.enum(["active", "out_of_stock", "archived"]).optional(),
+  // Pass null to clear the image. The previously stored file is deleted so a
+  // replaced image does not leak storage.
+  image_url: z.string().max(2048).optional().nullable(),
+  category: z.enum(["vegetable", "fruit", "grain", "herb"]).optional()
 });
 
 export async function PATCH(request, { params }) {
@@ -54,13 +59,22 @@ export async function PATCH(request, { params }) {
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.category !== undefined ? { category: data.category } : {}),
         ...(data.price_bdt !== undefined ? { priceBdt: data.price_bdt } : {}),
         ...(data.quantity_kg !== undefined ? { quantityKg: data.quantity_kg } : {}),
         ...(data.freshness_window_days !== undefined ? { freshnessWindowDays: data.freshness_window_days } : {}),
+        ...(data.image_url !== undefined ? { imageUrl: data.image_url || null } : {}),
         ...(data.status !== undefined ? { status: data.status.toUpperCase() } : {})
       },
       include: { farmer: { include: { user: true } } }
     });
+
+    // The image changed, so the file it replaced is now unreferenced. Deleting
+    // it is best-effort: a storage failure must not fail the product update.
+    if (data.image_url !== undefined && product.imageUrl && product.imageUrl !== updated.imageUrl) {
+      const staleKey = storageKeyFromUrl(product.imageUrl);
+      if (staleKey) await deleteObject(staleKey).catch(() => null);
+    }
 
     return ok({ product: toPublicProduct(updated) }, { message: "Product updated" });
   });

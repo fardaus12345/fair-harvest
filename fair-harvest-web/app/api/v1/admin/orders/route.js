@@ -8,7 +8,7 @@ export async function GET(request) {
     requireRole(request, ["ADMIN"]);
 
     const orders = await prisma.order.findMany({
-      include: { items: true, statusEvents: true, user: true },
+      include: { items: { include: { product: true } }, statusEvents: true, user: true },
       orderBy: { createdAt: "desc" }
     });
 

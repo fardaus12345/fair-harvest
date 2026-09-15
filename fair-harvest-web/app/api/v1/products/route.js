@@ -41,7 +41,10 @@ const createProductSchema = z.object({
   price_bdt: z.coerce.number().positive("Price must be greater than 0"),
   quantity_kg: z.coerce.number().positive("Stock must be greater than 0"),
   freshness_window_days: z.coerce.number().int().positive().optional(),
-  status: z.enum(["active", "out_of_stock", "archived"]).optional()
+  status: z.enum(["active", "out_of_stock", "archived"]).optional(),
+  // Produced by POST /api/v1/uploads/product-image, or an absolute URL if the
+  // deployment uses a remote storage provider.
+  image_url: z.string().max(2048).optional().nullable()
 });
 
 export async function POST(request) {
@@ -70,6 +73,7 @@ export async function POST(request) {
         priceBdt: data.price_bdt,
         quantityKg: data.quantity_kg,
         freshnessWindowDays: data.freshness_window_days ?? 2,
+        imageUrl: data.image_url || null,
         status: (data.status || "active").toUpperCase()
       },
       include: { farmer: { include: { user: true } } }

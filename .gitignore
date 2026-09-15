@@ -10,3 +10,7 @@ node_modules/
 # Leftover JSON-DB snapshot from the earlier prototype (main branch) — not
 # part of this Prisma-based app, kept locally but not tracked.
 fair-harvest-web/data/
+
+# Uploaded product images held by the local storage provider
+# (STORAGE_PROVIDER=local). Regenerated at runtime; not source.
+fair-harvest-web/storage/

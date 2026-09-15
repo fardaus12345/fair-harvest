@@ -60,7 +60,7 @@ export async function POST(request, { params }) {
           },
           statusEvents: { create: [{ status: "PENDING", note: "Order placed" }] }
         },
-        include: { items: true, statusEvents: true }
+        include: { items: { include: { product: true } }, statusEvents: true }
       });
 
       for (const item of cart.items) {
