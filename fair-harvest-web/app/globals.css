@@ -8,6 +8,9 @@
   --sun: #f3b74f;
   --tomato: #d9533f;
   --blue: #315f78;
+  /* Header height. The hero sizing below subtracts it, so it lives in one
+     place rather than being repeated as a literal. */
+  --header-h: 96px;
 }
 
 * {
@@ -41,7 +44,7 @@ svg {
 }
 
 .hero {
-  min-height: calc(92vh - 76px);
+  min-height: calc(92vh - var(--header-h));
   position: relative;
   overflow: hidden;
 }
@@ -57,7 +60,7 @@ svg {
 
 .heroOverlay {
   position: relative;
-  min-height: calc(92vh - 76px);
+  min-height: calc(92vh - var(--header-h));
   display: grid;
 }
 
@@ -71,7 +74,7 @@ svg {
 }
 
 .topbar {
-  height: 76px;
+  height: var(--header-h);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -121,14 +124,10 @@ svg {
    auto so the artwork keeps its aspect ratio and is never stretched. */
 .brandLogo {
   display: block;
-  height: 32px;
+  height: 72px;
   width: auto;
   max-width: 100%;
   flex-shrink: 0;
-}
-
-.footerBrand .brandLogo {
-  height: 30px;
 }
 
 .navStatus {
@@ -237,8 +236,8 @@ html[data-language="bn"] h3 {
   width: min(1320px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.2fr 1fr auto;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 24px 32px;
   align-items: center;
 }
 
@@ -261,14 +260,25 @@ html[data-language="bn"] h3 {
   line-height: 1.45;
 }
 
+/* A little more air under the taller logo. */
+.footerBrand span {
+  margin-top: 10px;
+}
+
 .footerLinks {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  flex-wrap: nowrap;
+  gap: 10px 22px;
   justify-content: center;
 }
 
+.globalFooter p {
+  justify-self: end;
+  text-align: right;
+}
+
 .footerLinks a {
+  white-space: nowrap;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -1244,6 +1254,28 @@ select {
   }
 }
 
+@media (min-width: 768px) and (max-width: 1280px) {
+  :root {
+    --header-h: 76px;
+  }
+
+  .brandLogo {
+    height: 32px;
+  }
+
+  .footerBrand .brandLogo {
+    height: 48px;
+  }
+
+  .footerInner {
+    gap: 20px;
+  }
+
+  .footerLinks {
+    gap: 10px 14px;
+  }
+}
+
 @media (max-width: 1023px) {
   .desktopNav {
     font-size: 13px;
@@ -1313,7 +1345,7 @@ select {
   }
 
   .brandLogo {
-    height: 28px;
+    height: 56px;
   }
 
   .hamburger {
@@ -1362,7 +1394,13 @@ select {
   }
 
   .footerLinks {
+    flex-wrap: wrap;
     justify-content: flex-start;
+  }
+
+  .globalFooter p {
+    justify-self: start;
+    text-align: left;
   }
 
   .heroContent h1,
