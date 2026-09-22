@@ -1393,14 +1393,30 @@ select {
     gap: 22px;
   }
 
+  .globalFooter {
+    padding: 24px 18px;
+  }
+
   .footerInner {
     grid-template-columns: 1fr;
+    gap: 16px;
     text-align: left;
   }
 
+  .footerBrand span {
+    margin-top: 6px;
+  }
+
+  /* Wrapping a flex row left the links ragged and viewport dependent: 3+3 at
+     320px, 4+2 at 375px, then 5+1 at 440px, which orphaned a single link on
+     its own row. Three equal tracks divide the six links evenly at every
+     width, and the widest label is 75px against an 87px track at 320px, so
+     the narrowest case still fits. */
   .footerLinks {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 12px;
+    justify-items: start;
   }
 
   .globalFooter p {
