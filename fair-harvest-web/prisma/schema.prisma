@@ -3,8 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled connection: serverless functions are short-lived and numerous, so
+  // application queries go through the connection pooler.
+  url       = env("DATABASE_URL")
+  // Direct connection: schema migrations need a session the pooler cannot
+  // provide, so DDL bypasses it.
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {

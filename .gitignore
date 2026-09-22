@@ -6,6 +6,7 @@ node_modules/
 .DS_Store
 *.db
 *.db-journal
+*.db.backup
 
 # Leftover JSON-DB snapshot from the earlier prototype (main branch) — not
 # part of this Prisma-based app, kept locally but not tracked.

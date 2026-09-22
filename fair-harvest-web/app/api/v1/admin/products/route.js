@@ -24,13 +24,14 @@ export async function GET(request) {
     if (status && STATUSES.includes(status)) where.status = status.toUpperCase();
     if (farmerId) where.farmerId = farmerId;
     if (search) {
-      // SQLite's LIKE is already case-insensitive for ASCII, so `contains` is
-      // sufficient here and stays portable to Postgres without a mode flag
-      // change for the farmer-name path below.
+      // Postgres LIKE is case sensitive, so `contains` alone would make
+      // searching "spinach" miss "Organic Spinach". SQLite was case
+      // insensitive for ASCII by default, which hid the difference until the
+      // move to Postgres.
       where.OR = [
-        { name: { contains: search } },
-        { description: { contains: search } },
-        { farmer: { user: { name: { contains: search } } } }
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { farmer: { user: { name: { contains: search, mode: "insensitive" } } } }
       ];
     }
 

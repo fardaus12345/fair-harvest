@@ -132,7 +132,14 @@ async function main() {
     { stage: "SHIPPED", daysAgo: 1, note: "Dispatched to Dhaka distribution hub" },
     { stage: "LISTED", daysAgo: 0, note: "Listed on Fair Harvest marketplace" }
   ];
+  // TraceEvent has no natural unique key to upsert on, so re-running the seed
+  // would otherwise append a second copy of every stage and the traceability
+  // timeline would show each step twice.
   for (const step of traceStages) {
+    const existing = await prisma.traceEvent.findFirst({
+      where: { productId: spinach.id, stage: step.stage }
+    });
+    if (existing) continue;
     const timestamp = new Date(Date.now() - step.daysAgo * 24 * 60 * 60 * 1000);
     await prisma.traceEvent.create({
       data: { productId: spinach.id, stage: step.stage, timestamp, note: step.note, gpsLat: 23.8103, gpsLng: 90.4125 }

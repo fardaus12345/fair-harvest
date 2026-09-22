@@ -38,9 +38,23 @@ export function deleteObject(key) {
  */
 export function storageKeyFromUrl(url) {
   if (typeof url !== "string") return null;
+
+  // Local provider: the URL is our own download route.
   const marker = "/api/v1/uploads/";
   const index = url.indexOf(marker);
-  if (index === -1) return null;
-  const key = url.slice(index + marker.length);
-  return key.length > 0 ? key : null;
+  if (index !== -1) {
+    const key = url.slice(index + marker.length);
+    return key.length > 0 ? key : null;
+  }
+
+  // Object provider: the URL is an absolute CDN address. Without this branch
+  // the key could not be recovered, so replacing an image would leave the file
+  // it replaced in the bucket forever with nothing referencing it.
+  const base = objectStorage.publicBaseUrl();
+  if (base && url.startsWith(`${base}/`)) {
+    const key = url.slice(base.length + 1);
+    return key.length > 0 ? key : null;
+  }
+
+  return null;
 }

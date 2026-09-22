@@ -5,19 +5,57 @@ accounts, Government Farmer Card verification, product listings, cart/checkout, 
 tracking, reviews, wishlists, public farmer profiles, farmer-driven product
 traceability, rewards, and an admin dashboard (including review moderation). The
 backend lives in this same app as Next.js Route Handlers under `app/api/v1/**`, backed
-by Prisma + SQLite - no separate API server to run.
+by Prisma + PostgreSQL - no separate API server to run.
 
 ## Run
+
+Needs a PostgreSQL database. A free Neon branch works, as does a local server.
 
 ```bash
 npm install
 cp .env.example .env.local
-npx prisma migrate dev
+# Put DATABASE_URL and DIRECT_URL in .env, NOT .env.local:
+# the Prisma CLI reads .env only, while Next.js reads both.
+npx prisma migrate deploy
 npx prisma db seed
 npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+`prisma db seed` is safe to run repeatedly: every record is upserted or
+existence-checked, so it will not duplicate demo data.
+
+## Database connections
+
+Two URLs, because they are used for different things:
+
+| Variable | Connection | Used by |
+|---|---|---|
+| `DATABASE_URL` | pooled (Neon: the `-pooler` host) | the application at runtime |
+| `DIRECT_URL` | direct (no pooler) | `prisma migrate` only |
+
+Serverless functions are short-lived and numerous, so runtime queries go through
+the pooler; schema migrations need a session the pooler cannot provide.
+
+## Product image storage
+
+`STORAGE_PROVIDER` selects where uploaded images are kept. Both providers
+implement the same contract in `lib/server/storage/`, so the upload route, the
+`Product` schema and every component are identical either way - only the stored
+URL differs.
+
+| Value | Provider | Use |
+|---|---|---|
+| `local` | `localDiskProvider.js` - writes under `UPLOAD_DIR` | development |
+| `object` | `objectStorageProvider.js` - Vercel Blob | production |
+
+Production must use `object`: a deployed serverless filesystem is read-only
+outside `/tmp` and is discarded between invocations. `object` needs
+`BLOB_READ_WRITE_TOKEN` (injected automatically when a Blob store is attached to
+the Vercel project) and `BLOB_PUBLIC_BASE_URL`.
+
+Image bytes are never stored in PostgreSQL; the database holds only the URL.
 
 ## Demo accounts (from `prisma/seed.mjs`)
 
