@@ -675,10 +675,7 @@ h1 {
 
   .topbar {
     height: auto;
-    padding-top: 18px;
-    gap: 14px;
-    align-items: flex-start;
-    flex-direction: column;
+    gap: 12px;
   }
 
   .heroContent {
@@ -1346,6 +1343,14 @@ select {
 
   .brandLogo {
     height: 56px;
+  }
+
+  /* Header only. It shares one row with the language toggle and the
+     hamburger, so the mark scales with the viewport rather than forcing a
+     wrap on a narrow phone. The footer stacks and keeps the full 56px.
+     Above ~509px this still resolves to 56px. */
+  .brand .brandLogo {
+    height: clamp(36px, 11vw, 56px);
   }
 
   .hamburger {
