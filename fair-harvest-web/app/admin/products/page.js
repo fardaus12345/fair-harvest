@@ -79,7 +79,23 @@ export default function AdminProductsPage() {
     }
   }
 
+  async function restore(product) {
+    const confirmed = window.confirm(
+      `Restore "${product.name}"?\n\nIt will become active and visible in the marketplace again.`
+    );
+    if (!confirmed) return;
+    await setStatus(product, "active");
+  }
+
   async function archive(product) {
+    // Reversible, but it pulls the listing out of the marketplace, so confirm
+    // first. Restore is available on the same row afterwards.
+    const confirmed = window.confirm(
+      `Archive "${product.name}"?\n\nIt will no longer appear in the marketplace, ` +
+        "but it can be restored later."
+    );
+    if (!confirmed) return;
+
     setError("");
     try {
       await archiveProduct(product.product_id);
@@ -162,7 +178,7 @@ export default function AdminProductsPage() {
                 <span className={product.status === "active" ? "badge good" : "badge"}>{product.status}</span>
                 <button type="button" onClick={() => startEdit(product)}><Pencil size={14} /> Edit</button>
                 {product.status === "archived" ? (
-                  <button type="button" onClick={() => setStatus(product, "active")}>Restore</button>
+                  <button type="button" onClick={() => restore(product)}>Restore</button>
                 ) : (
                   <button type="button" onClick={() => archive(product)}>Archive</button>
                 )}

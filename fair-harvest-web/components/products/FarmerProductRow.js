@@ -53,6 +53,14 @@ export default function FarmerProductRow({ product, onChanged, onMarkListed, lis
   }
 
   async function archive() {
+    // Archiving is reversible (an admin can restore it), but it removes the
+    // listing from the marketplace, so it should not happen on a stray click.
+    const confirmed = window.confirm(
+      `Archive "${product.name}"?\n\nIt will no longer appear in the marketplace, ` +
+        "but it can be restored later."
+    );
+    if (!confirmed) return;
+
     setSaving(true);
     try {
       await archiveProduct(product.product_id);

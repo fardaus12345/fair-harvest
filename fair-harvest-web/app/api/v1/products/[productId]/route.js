@@ -2,6 +2,8 @@ import { z } from "zod";
 import { prisma } from "../../../../../lib/server/db.js";
 import { requireUser } from "../../../../../lib/server/auth.js";
 import { ok, handleRoute, ApiError } from "../../../../../lib/server/respond.js";
+import { enforceRateLimit } from "../../../../../lib/server/rateLimit.js";
+import { recordAudit } from "../../../../../lib/server/audit.js";
 import { toPublicProduct } from "../../../../../lib/server/serializers.js";
 import { deleteObject, storageKeyFromUrl } from "../../../../../lib/server/storage/index.js";
 
@@ -83,6 +85,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   return handleRoute(async () => {
     const session = requireUser(request);
+    enforceRateLimit(request, "product-archive", { max: 20, windowMs: 60_000 });
     const { productId } = await params;
     const product = await loadProduct(productId);
     assertOwnerOrAdmin(session, product);
@@ -93,6 +96,17 @@ export async function DELETE(request, { params }) {
       where: { id: productId },
       data: { status: "ARCHIVED" },
       include: { farmer: { include: { user: true } } }
+    });
+
+    // Recorded after the update, so a refused request leaves no entry claiming
+    // an archive that never happened. recordAudit never throws.
+    await recordAudit({
+      actorId: session.userId,
+      actorRole: session.role,
+      action: "product_archived",
+      targetType: "Product",
+      targetId: productId,
+      metadata: { previousStatus: product.status, farmerId: product.farmerId }
     });
 
     return ok({ product: toPublicProduct(archived) }, { message: "Product archived" });
