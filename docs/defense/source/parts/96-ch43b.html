@@ -1,0 +1,216 @@
+<h2 class="newpage">F. পণ্য, Archive ও Soft Delete</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩১: পণ্য delete করলে কী হয়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>ডাটাবেস থেকে মুছে যায় না — শুধু <span class="mono">status</span> হয়ে যায় <span class="mono">ARCHIVED</span>। একে বলে soft delete।</p>
+  <p><span class="lbl">Technical</span><br>Endpoint-এর নাম <span class="mono">DELETE</span> হলেও ভিতরে <span class="mono">prisma.product.update({ data: { status: "ARCHIVED" } })</span> চলে। পণ্যটি marketplace থেকে অদৃশ্য হয়, কিন্তু পুরোনো order, review ও trace সব অক্ষত থাকে।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">app/api/v1/products/[productId]/route.js</span></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩২: Hard delete রাখলেন না কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কারণ পুরোনো order ওই পণ্যটিকে নির্দেশ করে। মুছে ফেললে ক্রেতার order history ভেঙে যেত।</p>
+  <p><span class="lbl">Technical</span><br>ডাটাবেসই এটি আটকে দেয়: <span class="mono">OrderItem.productId → Product</span> সম্পর্কে কোনো <span class="mono">onDelete: Cascade</span> নেই, তাই Prisma-র ডিফল্ট <strong>RESTRICT</strong> কার্যকর। order থাকলে PostgreSQL সারিটি মুছতেই দেবে না। তাছাড়া Review ও TraceEvent cascade-এ মুছে যেত — অর্থাৎ কৃষকের reputation-ও হঠাৎ বদলে যেত।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “তাহলে পণ্য কি চিরকাল থাকবে?” → “হ্যাঁ, এবং সেটিই উদ্দেশ্য। এটি একটি ঐতিহাসিক রেকর্ড। তবে চাইলে কোনো order নেই এমন পণ্যের জন্য admin-only hard delete যোগ করা যেত।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৩: Archive করা পণ্য কি ফেরত আনা যায়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>হ্যাঁ। <span class="mono">PATCH /products/{id}</span> দিয়ে <span class="mono">status: "active"</span> করলেই আবার marketplace-এ ফিরে আসে — ছবি ও সব তথ্যসহ।</p>
+  <p><span class="lbl">Technical</span><br>Restore-এর জন্য আলাদা endpoint নেই, কারণ এটি নিছক একটি status পরিবর্তন। Admin console-এ archived সারিতে “Restore” বোতাম আসে, আর কৃষক edit form-এর status drop-down থেকে করতে পারেন। দুটোতেই <span class="mono">window.confirm</span> দেখানো হয়।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৪: Archive হলে wishlist বা cart-এ কী হয়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Wishlist-এ সারিটি থেকে যায় (কিন্তু “অনুপলব্ধ” বলে চিহ্নিত হয় না — এটি একটি সীমাবদ্ধতা)। Cart-এ নতুন করে যোগ করা যায় না, আর আগে থেকে থাকলে checkout-এ আটকে যায়।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">POST /cart/{userId}/items</span>-এ শর্ত: <span class="mono">if (!product || product.status !== "ACTIVE") throw 404</span>।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৫: OUT_OF_STOCK আর ARCHIVED — পার্থক্য কী?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>OUT_OF_STOCK মানে “এখন নেই, পরে আসবে”; ARCHIVED মানে “আর বিক্রি করছি না”। দুটোই marketplace থেকে লুকানো থাকে।</p>
+  <p><span class="lbl">Technical</span><br>কোডগতভাবে পার্থক্য শুধু অর্থে — filter একটিই: <span class="mono">where.status = "ACTIVE"</span>। ভবিষ্যতে OUT_OF_STOCK পণ্যকে “stock এলে জানাবো” বোতামসহ ধূসর করে দেখানো যেত।</p>
+</div>
+
+<h2>G. Cart, Order ও Payment</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৬: Cart আর CartItem আলাদা টেবিল কেন? Order আর OrderItem-ও?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>এটি database normalization। একটি cart-এ অনেক item থাকে — এটি one-to-many সম্পর্ক, তাই আলাদা টেবিল।</p>
+  <p><span class="lbl">Technical</span><br>এক টেবিলে রাখলে একই ব্যবহারকারীর ঠিকানা, মোট দাম ইত্যাদি প্রতিটি সারিতে পুনরাবৃত্তি হতো (update anomaly)। আলাদা রাখায় Cart-এ ব্যবহারকারীর তথ্য একবার, আর CartItem-এ প্রতিটি পণ্য একবার। Order/OrderItem-ও একই যুক্তি।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৭: OrderItem-এ পণ্যের নাম আবার কেন রাখলেন? Product থেকে join করলেই তো হয়!</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কারণ কৃষক আগামীকাল নাম বা দাম বদলাতে পারেন — কিন্তু পুরোনো রসিদে সেদিনের নাম ও দামই থাকা উচিত।</p>
+  <p><span class="lbl">Technical</span><br>এটিকে বলে ঐতিহাসিক নির্ভুলতার জন্য <em>ইচ্ছাকৃত denormalization</em>। <span class="mono">nameSnapshot</span>, <span class="mono">unitPriceBdt</span> ও <span class="mono">lineTotalBdt</span> checkout-এর মুহূর্তে কপি করা হয়। এটি একটি চমৎকার প্রশ্ন, কারণ এতে বোঝা যায় আপনি normalization-এর নিয়ম শুধু মুখস্থ করেননি — কখন ভাঙতে হয় তাও জানেন।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৮: Checkout-এর সময় ঠিক কী কী ঘটে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>একটিমাত্র ডাটাবেস transaction-এ পাঁচটি কাজ — Order ও OrderItem তৈরি, stock কমানো, Payment তৈরি, ২০ reward point দেওয়া, আর cart খালি করা।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">prisma.$transaction(async (tx) =&gt; { … })</span>। আগে যাচাই হয় — cart খালি কি না (400) এবং প্রতিটি item-এর জন্য <span class="mono">product.quantityKg &lt; item.quantityKg</span> (409)।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">app/api/v1/orders/[id]/checkout/route.js</span></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩৯: Transaction কেন দরকার?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>যাতে হয় সব কাজ হয়, নয়তো একটিও না হয়।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>ধরুন order তৈরি হলো কিন্তু stock কমানোর আগে server বন্ধ হয়ে গেল — তাহলে এমন একটি order থাকত যার জন্য কোনো stock কাটা হয়নি। Transaction ব্যর্থ হলে ডাটাবেস আগের অবস্থায় ফিরে যায় (rollback)। এটি ACID-এর <strong>A — Atomicity</strong>।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪০: Payment কি আসল?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br><strong>না, সম্পূর্ণ demo।</strong> কোনো payment gateway নেই, কোনো আসল টাকা লেনদেন হয় না।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>দুটি পদ্ধতি আছে: <span class="mono">DEMO_CARD</span> (কোড সরাসরি PAID লিখে দেয়, কার্ড নম্বর চাওয়াই হয় না) আর <span class="mono">COD</span> (PENDING থাকে)। enum-এর নাম, <span class="mono">demoTransactionRef</span> ফিল্ড আর UI-র “Payment (demo)” লেখা — সব জায়গায় এটি স্বীকার করা আছে।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “আসল payment যোগ করতে কত কাজ?” → “Payment মডেল ইতিমধ্যেই আছে। bKash বা SSLCommerz-এর sandbox যোগ করে তাদের webhook দিয়ে <span class="mono">PaymentStatus</span> হালনাগাদ করলেই হবে — checkout-এর বাকি যুক্তি অপরিবর্তিত থাকবে।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪১: Order-এর status কে বদলাতে পারে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Admin যেকোনো order, আর কৃষক শুধু সেই order যেখানে তার নিজের পণ্য আছে। ক্রেতা পারেন না।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">order.items.some(item =&gt; item.farmerId === farmerProfile.id)</span> — না হলে 403। প্রতিটি পরিবর্তনে একটি <span class="mono">OrderStatusEvent</span> যোগ হয়, আর DELIVERED বা CANCELLED হলে ওই order-এর প্রতিটি কৃষকের reputation নতুন করে গণনা হয়।</p>
+  <p class="where"><span class="lbl">সীমাবদ্ধতা স্বীকার করুন</span> কোনো state machine নেই — PENDING থেকে সরাসরি DELIVERED-এ যাওয়া যায়।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪২: একই order-এ দুই কৃষকের পণ্য থাকলে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>দুজনেই শুধু নিজের item দেখেন। কেউ অন্যের অংশ বা ক্রেতার পুরো বিল দেখতে পান না।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">GET /farmer/orders</span> Order নয়, <span class="mono">OrderItem</span>-এর উপর query করে, এবং <span class="mono">farmerId</span> session থেকে নেওয়া। এটি একটি সচেতন privacy সিদ্ধান্ত।</p>
+</div>
+
+<h2>H. Review</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৩: ভুয়া review কীভাবে ঠেকান?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>তিন স্তরে — UI-তে form লুকানো, server-এ DELIVERED order যাচাই, আর ডাটাবেসে দুটি unique constraint।</p>
+  <p><span class="lbl">Technical</span><br>Server নিজে <span class="mono">prisma.orderItem.findFirst({ where: { productId, order: { userId: customerId, status: "DELIVERED" } } })</span> চালায় — ক্লায়েন্টের দাবি বিশ্বাস করে না। তারপর ডাটাবেসে <span class="mono">orderItemId @unique</span> (এক ক্রয় = এক review) এবং <span class="mono">@@unique([customerId, productId])</span> (এক ক্রেতা এক পণ্যে একবার) — কোড ভুল করলেও ডাটাবেস আটকে দেবে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৪: দুটি unique constraint কেন? একটিতে হতো না?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>দুটি আলাদা আক্রমণ ঠেকায়। প্রথমটি একই ক্রয়ে দুইবার review; দ্বিতীয়টি একই পণ্য পাঁচবার কিনে পাঁচটি ৫-তারা দেওয়া (review farming)।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৫: Admin কি খারাপ review মুছে দিতে পারেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>মুছতে পারেন না, শুধু <span class="mono">HIDDEN</span> করতে পারেন। সারিটি ডাটাবেসে থেকে যায়।</p>
+  <p><span class="lbl">Technical</span><br>Public <span class="mono">GET /reviews</span> সবসময় <span class="mono">status: "PUBLISHED"</span> দিয়ে filter করে। Moderation-এর পর কৃষকের reputation নতুন করে গণনা হয় (কারণ hidden review আর গোনা হবে না) এবং <span class="mono">review_moderated</span> audit entry লেখা হয়।</p>
+</div>
+
+<h2>I. Database</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৬: আপনার ডাটাবেসে কতটি টেবিল? প্রধানগুলো বলুন।</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>১৫টি মডেল ও ১৩টি enum। প্রধান হলো User, FarmerProfile, Product, Cart/CartItem, Order/OrderItem, Review, TraceEvent, AuditLog।</p>
+  <p><span class="lbl">Technical</span><br>১৮টি foreign key, ৯টি unique constraint, ১২টি index। সব primary key <span class="mono">String @id @default(cuid())</span>।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৭: cuid কেন, auto-increment integer নয় কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>ক্রমিক সংখ্যা হলে URL দেখে যে কেউ বুঝে যেত মোট কতগুলো পণ্য আছে, আর ১, ২, ৩ করে সব দেখে ফেলতে পারত।</p>
+  <p><span class="lbl">Technical</span><br>এছাড়া cuid একাধিক server থেকে একসাথে তৈরি করলেও সংঘর্ষ হয় না, এবং ক্লায়েন্টেই তৈরি করা যায় — ডাটাবেসের অপেক্ষা না করে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৮: Cascade আর Restrict কোথায় কোথায় ব্যবহার করেছেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>যে ডেটা মালিক ছাড়া অর্থহীন সেখানে Cascade (Cart, CartItem, TraceEvent, OrderStatusEvent); আর যেখানে ইতিহাস রক্ষা করতে হবে সেখানে Restrict (Product ← OrderItem, OrderItem ← Review)।</p>
+  <p><span class="lbl">Technical</span><br>Prisma-তে <span class="mono">onDelete</span> না লিখলে required relation-এর ডিফল্ট Restrict। <span class="mono">Product ← OrderItem</span>-এ ইচ্ছাকৃতভাবে কিছু লিখিনি, তাই Restrict কার্যকর — এবং এটিই soft delete-কে বাধ্যতামূলক করে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪৯: AuditLog-এ foreign key নেই কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কারণ যাকে নিয়ে লগ, সে মুছে গেলেও লগটি টিকে থাকা দরকার।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">actorId</span> ও <span class="mono">targetId</span> শুধু string snapshot। FK হলে cascade বা restrict-এর কারণে লগ হারিয়ে যেত বা লেখাই যেত না — অথচ audit log-এর পুরো উদ্দেশ্যই প্রমাণ ধরে রাখা।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫০: Migration কী? আপনি কয়টি চালিয়েছেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Migration হলো ডাটাবেসের গঠন পরিবর্তনের নথিভুক্ত ইতিহাস। আমার একটি migration আছে — <span class="mono">20260922135451_init</span>।</p>
+  <p><span class="lbl">Technical</span><br>এটি সম্পূর্ণ PostgreSQL SQL: ১৩টি <span class="mono">CREATE TYPE</span>, ১৫টি <span class="mono">CREATE TABLE</span>, ২১টি index ও ১৮টি FK। Production-এ <span class="mono">prisma migrate deploy</span> শুধু অপ্রয়োগকৃত migration চালায়, কিছু মোছে না — তাই এটি নিরাপদ। এটি Vercel-এর build কমান্ডেই যুক্ত।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫১: Seed কী? বারবার চালালে ডেটা দ্বিগুণ হবে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Seed হলো ডেমো ডেটা ঢোকানোর স্ক্রিপ্ট। না, দ্বিগুণ হয় না — প্রতিটি রেকর্ড <span class="mono">upsert</span> বা অস্তিত্ব-যাচাই দিয়ে তৈরি।</p>
+  <p><span class="lbl">Technical</span><br>একটি বিশেষ ক্ষেত্র ছিল: <span class="mono">TraceEvent</span>-এর কোনো স্বাভাবিক unique key নেই, তাই upsert করা যায় না। তাই প্রতিটি ধাপের আগে <span class="mono">findFirst</span> দিয়ে দেখে নেওয়া হয় — নাহলে দ্বিতীয়বার seed চালালে timeline-এ প্রতিটি ধাপ দুইবার দেখাত।</p>
+</div>
+
+<h2>J. Security, Deployment ও Testing</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫২: SQL injection ঠেকান কীভাবে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Prisma সবসময় parameterized query তৈরি করে, তাই ব্যবহারকারীর লেখা কখনো SQL-এর অংশ হয় না।</p>
+  <p><span class="lbl">Technical</span><br>আমার প্রজেক্টে কাঁচা SQL শুধু এক জায়গায় — <span class="mono">app/ready/route.js</span>-এ <span class="mono">prisma.$queryRaw`SELECT 1`</span>, যেখানে কোনো ব্যবহারকারীর ইনপুটই নেই। এছাড়া Zod প্রতিটি ইনপুটের ধরন আগেই যাচাই করে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৩: XSS নিয়ে কী ব্যবস্থা?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>React নিজে থেকেই সব লেখা escape করে; আর আমি কোথাও <span class="mono">dangerouslySetInnerHTML</span> ব্যবহার করিনি।</p>
+  <p><span class="lbl">Technical</span><br>এছাড়া ছবি আপলোডে SVG ইচ্ছাকৃতভাবে নিষিদ্ধ, কারণ SVG-তে JavaScript থাকতে পারে আর ফাইল আমাদেরই origin থেকে পরিবেশিত হয়। Download route-এ <span class="mono">X-Content-Type-Options: nosniff</span> দেওয়া আছে। তবে CSP header নেই — এটি একটি সীমাবদ্ধতা।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৪: Rate limiting কীভাবে করেছেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>একটি in-memory sliding-window limiter — যেমন login-এ এক মিনিটে সর্বোচ্চ ১০ বার। ছাড়ালে 429।</p>
+  <p><span class="lbl">Technical</span><br>IP-ভিত্তিক key (<span class="mono">x-forwarded-for</span> থেকে), একটি <span class="mono">Map</span>-এ timestamp-এর তালিকা, আর প্রতিবার সময়-সীমার বাইরের entry বাদ দেওয়া। পাঁচটি endpoint-এ প্রয়োগ করা: login ১০, register ৬, farmer-verify ৮, image-upload ২০, product-archive ২০ — সবই প্রতি ৬০ সেকেন্ডে।</p>
+  <p class="where"><span class="lbl">সীমাবদ্ধতা নিজে বলুন</span> “এটি একক process-এর memory-তে থাকে, তাই একাধিক serverless instance-এ নির্ভরযোগ্য নয়। প্রকৃত production-এ Redis লাগত — কোডের কমেন্টেই আমি এটি লিখে রেখেছি।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৫: NID নম্বর কীভাবে সুরক্ষিত রাখেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কোনো API response-এ পুরো NID বা Farmer Card নম্বর কখনো যায় না — শেষ ৪ অক্ষর ছাড়া সব <span class="mono">*</span> করা থাকে, admin-এর জন্যও।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">maskIdentifier("BD-FARM-0001") → "********0001"</span>। এটি <span class="mono">toAdminFarmer()</span> ও public farmer profile — দুটোতেই প্রয়োগ করা, এবং এর জন্য ৪টি unit test আছে যার একটি নিশ্চিত করে “কখনো মূল মান ফেরত দেয় না”।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৬: কতগুলো টেস্ট লিখেছেন? কী পরীক্ষা করে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>২৬টি unit test web অ্যাপে এবং ৫টি SDK-তে — মোট ৩১টি, সবগুলো পাস।</p>
+  <p><span class="lbl">Technical</span><br>Reputation গণনা (৪), image validation ও path traversal (৯), identifier masking (৪), earnings সারাংশ (৩), rate limiting (৩), review eligibility (৩)। সবগুলো <span class="mono">node --test</span> দিয়ে চলে, কোনো ডাটাবেস ছাড়াই — কারণ এই logic-গুলো ইচ্ছাকৃতভাবে pure function হিসেবে আলাদা রাখা।</p>
+  <p class="where"><span class="lbl">সীমাবদ্ধতা</span> route-level integration test, component test ও E2E test নেই; ওগুলো হাতে যাচাই করা হয়েছে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৭: প্রজেক্টটি কোথায় deploy করা?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Vercel-এ, GitHub-এর সাথে যুক্ত। ডাটাবেস Neon PostgreSQL, ছবি Vercel Blob।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">main</span> branch = production, অন্য প্রতিটি branch = preview। Build কমান্ড: <span class="mono">prisma generate &amp;&amp; prisma migrate deploy &amp;&amp; next build</span> — অর্থাৎ প্রতিটি deploy-এ migration স্বয়ংক্রিয়ভাবে প্রয়োগ হয়।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৮: Deploy করতে গিয়ে কোনো সমস্যায় পড়েছিলেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>হ্যাঁ, তিনটি — এবং তিনটিরই মূল কারণ খুঁজে বের করে সমাধান করেছি।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>(১) Build-এ হোমপেজ ৬০ সেকেন্ডে টাইমআউট হচ্ছিল, কারণ সেটি static generation-এর সময় নিজের API-তে কল করছিল যখন server চালুই হয়নি — সমাধান: server-side-এ fallback + ৫ সেকেন্ডের timeout। (২) Production login-এ “Internal server error”, কারণ <span class="mono">main</span> branch-এ তখনো <span class="mono">provider = "sqlite"</span> — সমাধান: PostgreSQL branch merge করা। (৩) ছবি আপলোডে <span class="mono">ENOENT mkdir /var/task/…</span>, কারণ <span class="mono">STORAGE_PROVIDER</span> সেট করা ছিল না — সমাধান: <span class="mono">object</span> সেট করা।</p>
+  <p class="where"><span class="lbl">টিপ</span> এই প্রশ্নে বিস্তারিত উত্তর দিন — এটি প্রমাণ করে প্রজেক্ট সত্যিই deploy হয়েছে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫৯: দুটি ডাটাবেস URL কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br><span class="mono">DATABASE_URL</span> pooled — অ্যাপ চলার জন্য; <span class="mono">DIRECT_URL</span> direct — শুধু migration-এর জন্য।</p>
+  <p><span class="lbl">Technical</span><br>Serverless function ক্ষণস্থায়ী ও অসংখ্য; প্রত্যেকে নিজের সংযোগ খুললে PostgreSQL-এর সংযোগ-সীমা ফুরিয়ে যেত, তাই pooler। কিন্তু <span class="mono">CREATE TABLE</span>-এর মতো DDL-এর জন্য একটি স্থায়ী session লাগে, যা pooler দিতে পারে না — তাই migration সরাসরি সংযোগ ব্যবহার করে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৬০: আপনার প্রজেক্টের দুর্বলতা কী?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>সবচেয়ে বড় তিনটি — প্রকৃত payment gateway নেই, Farmer Card verification একটি demo registry, আর rate limiting একক process-এর memory-তে।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>এছাড়া notification নেই, pagination নেই, profile সম্পাদনা নেই, integration test নেই। marketplace-এর search শুধু client-side। আমি এগুলো নথিভুক্ত করে রেখেছি এবং প্রতিটির সমাধানের পথও লিখেছি — কারণ কোনটা করা হয়নি তা জানাটাও প্রজেক্ট বোঝারই অংশ।</p>
+  <p class="where"><span class="lbl">টিপ</span> এই প্রশ্নে কখনো “কোনো দুর্বলতা নেই” বলবেন না। প্রস্তুত তালিকা থেকে ৩-৪টি বলুন, সাথে সমাধানের পথ।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৬১: আবার শুরু করলে কী ভিন্নভাবে করতেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>শুরু থেকেই PostgreSQL ব্যবহার করতাম, এবং route-level integration test লিখতাম।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>SQLite দিয়ে শুরু করে পরে PostgreSQL-এ যেতে গিয়ে case-sensitivity-র মতো সূক্ষ্ম পার্থক্য ধরা পড়েছিল (admin search ভেঙে যেত)। আর ownership/IDOR-এর জন্য স্বয়ংক্রিয় টেস্ট থাকলে প্রতিটি পরিবর্তনের পর নিশ্চিত থাকা যেত।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৬২: “AI-Enabled” বলছেন — AI কোথায়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>সৎভাবে বললে — এই সংস্করণে কোনো প্রশিক্ষিত AI মডেল নেই। nutrition, scanner, health prediction — সবই সূত্র বা heuristic।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>শিরোনামের “AI-Enabled” বলতে বোঝানো হয়েছে যে স্থাপত্যটি AI যুক্ত করার জন্য প্রস্তুত — API contract নির্দিষ্ট, তাই <span class="mono">/scanner/analyze</span>-এর ভিতরের heuristic-টি একটি image classification মডেল দিয়ে বদলে দিলে বাইরের কিছুই বদলাবে না। আমি প্রতিটি demo module-এর UI-তে এটি স্পষ্ট করে লিখেও দিয়েছি।</p>
+  <p class="where"><span class="lbl">টিপ</span> এই প্রশ্নটি আসতে পারে এবং একটু কঠিন শোনায়। সরাসরি স্বীকার করে নিলে বোর্ড সন্তুষ্ট হন; লুকাতে গেলে বিপদ।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৬৩: ১০,০০০ ব্যবহারকারী হলে কী হবে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Vercel ও Neon নিজে থেকেই scale করে, কিন্তু তিনটি জায়গা আগে ঠিক করতে হবে — pagination, in-memory rate limiting, আর কিছু query-র index।</p>
+  <p><span class="lbl">Technical</span><br>(১) কোনো তালিকায় pagination নেই, তাই ১০,০০০ পণ্য একবারে আসত। (২) Rate limit প্রতিটি instance-এ আলাদা — Redis লাগবে। (৩) Serverless-এ সংযোগ-সীমা: pooled <span class="mono">DATABASE_URL</span> ইতিমধ্যেই সেই সমস্যার সমাধান। index ইতিমধ্যেই প্রধান filter কলামগুলোতে আছে।</p>
+</div>

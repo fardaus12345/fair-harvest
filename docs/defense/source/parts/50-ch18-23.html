@@ -1,0 +1,387 @@
+<!--PART:ভাগ ঙ — ক্রয়, অর্ডার ও মূল্যায়ন-->
+<h1 class="chapter" id="ch18"><span class="num">18</span>Cart System<span class="mk">[[C18]]</span></h1>
+
+<h2>18.1 Cart আর CartItem আলাদা কেন?</h2>
+<p>এটি database normalization-এর একটি পাঠ্যবই উদাহরণ। <span class="mono">Cart</span> হলো
+<em>ধারক</em> (প্রতি ব্যবহারকারীর ঠিক একটি), আর <span class="mono">CartItem</span> হলো তার ভিতরের
+প্রতিটি সারি। একটিতে সব রাখলে একই user-এর অনেক সারি লাগত এবং “cart খালি করা” বা “cart-এর মালিক কে”
+— এসব প্রশ্নের উত্তর জটিল হতো।</p>
+<pre>model Cart     { id  String @id  userId String @unique  items CartItem[] }
+model CartItem { id  String @id  cartId String  productId String
+                 quantityKg Float  unitPriceBdt Float  source CartItemSource
+                 @@unique([cartId, productId, source]) }</pre>
+
+<h2>18.2 তিনটি গুরুত্বপূর্ণ সিদ্ধান্ত</h2>
+<table class="data">
+  <tr><th style="width:26%">সিদ্ধান্ত</th><th>কারণ</th></tr>
+  <tr><td><span class="mono">userId @unique</span></td><td>একজন ব্যবহারকারীর একটির বেশি cart থাকতে পারবে না — ডাটাবেসই নিশ্চিত করে</td></tr>
+  <tr><td><span class="mono">unitPriceBdt</span> CartItem-এ কপি করা</td>
+      <td>cart-এ রাখার সময়ের দাম মনে রাখার জন্য। তবে একই পণ্য আবার যোগ করলে দাম নতুন করে বসানো হয়
+      (<span class="mono">unitPriceBdt: product.priceBdt</span>)।</td></tr>
+  <tr><td><span class="mono">@@unique([cartId, productId, source])</span></td>
+      <td>একই পণ্য একই উৎস থেকে দুইবার সারি হিসেবে আসবে না — পরিমাণ যোগ হয়ে যাবে</td></tr>
+</table>
+
+<h2>18.3 CartItemSource</h2>
+<p>enum-এ তিনটি মান আছে: <span class="mono">DIRECT</span>, <span class="mono">MEAL_PLAN</span>,
+<span class="mono">PRESCRIPTION</span>। বাস্তবে UI থেকে শুধু <span class="mono">DIRECT</span>-ই তৈরি হয়;
+বাকি দুটি ভবিষ্যতের meal-plan ও ডাক্তারের prescription ফিচারের জন্য জায়গা রাখা
+<span class="chip part">আংশিক — enum আছে, UI নেই</span>।</p>
+
+<h2>18.4 Cart-এর API</h2>
+<table class="data tight">
+  <tr><th style="width:9%">Method</th><th style="width:31%">Endpoint</th><th style="width:20%">অনুমোদন</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/api/v1/cart/{userId}</span></td><td>মালিক বা ADMIN</td><td>cart + subtotal</td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/api/v1/cart/{userId}</span></td><td>মালিক বা ADMIN</td><td>সব item মুছে ফেলা</td></tr>
+  <tr><td>POST</td><td><span class="mono">/api/v1/cart/{userId}/items</span></td><td>মালিক বা ADMIN</td><td>item যোগ বা পরিমাণ বৃদ্ধি</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/api/v1/cart/{userId}/items/{itemId}</span></td><td>মালিক বা ADMIN</td><td>পরিমাণ বদল</td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/api/v1/cart/{userId}/items/{itemId}</span></td><td>মালিক বা ADMIN</td><td>item মুছে ফেলা</td></tr>
+</table>
+
+<h2>18.5 Backend যা করে</h2>
+<ol>
+  <li><strong>প্রাপ্যতা যাচাই:</strong> <span class="mono">if (!product || product.status !== "ACTIVE")</span>
+      → <span class="mono">404 "Product is not available"</span>। অর্থাৎ archived বা out-of-stock পণ্য
+      cart-এ যোগই করা যায় না।</li>
+  <li><strong>Cart তৈরি বা খুঁজে বের করা:</strong> <span class="mono">prisma.cart.upsert()</span> —
+      না থাকলে বানায়, থাকলে ব্যবহার করে।</li>
+  <li><strong>যোগ না বৃদ্ধি:</strong> একই <span class="mono">(cartId, productId, source)</span> থাকলে
+      <span class="mono">quantityKg: existing.quantityKg + quantityKg</span>, নাহলে নতুন সারি।</li>
+  <li><strong>মালিকানা যাচাই (item-এর ক্ষেত্রে):</strong> <span class="mono">assertOwnedItem()</span>
+      দেখে <span class="mono">item.cart.userId === userId</span> কি না — না হলে
+      <span class="mono">404</span> (403 নয়, যাতে অন্যের item-এর অস্তিত্ব ফাঁস না হয়)।</li>
+</ol>
+
+<h2>18.6 Frontend যা করে</h2>
+<p><span class="mono">components/cart/useCart.js</span> একটি custom React hook যা cart-এর সব কাজ এক
+জায়গায় রাখে: <span class="mono">{ cart, loading, addItem, updateItem, removeItem, clear, refresh, isLoggedIn }</span>।
+প্রতিটি পরিবর্তনের পর <span class="mono">refresh()</span> ডেকে server থেকে নতুন করে cart আনা হয় —
+অর্থাৎ subtotal সবসময় server-এর হিসাব, client-এর অনুমান নয়।</p>
+<p>Login না থাকলে <span class="mono">addItem()</span> সরাসরি
+<span class="mono">/auth/customer</span>-এ পাঠিয়ে দেয়।</p>
+
+<h2>18.7 মোট হিসাব</h2>
+<pre>// serializers.js → toPublicCart()
+line_total_bdt = Number((unitPriceBdt * quantityKg).toFixed(2))
+subtotal_bdt   = Number(items.reduce((s, i) =&gt; s + i.line_total_bdt, 0).toFixed(2))</pre>
+<p><span class="mono">toFixed(2)</span> ব্যবহার করা হয় যাতে floating-point-এর কারণে
+<span class="mono">299.99999997</span> জাতীয় সংখ্যা না দেখায়।</p>
+
+<figure class="wide">
+  <img src="shots/11-cart" alt="Cart page">
+  <figcaption class="caption">চিত্র 20: Cart পেজ — প্রতিটি সারিতে ছবি, দাম, সম্পাদনাযোগ্য পরিমাণ, লাইন-টোটাল ও source badge; নিচে subtotal।</figcaption>
+</figure>
+
+<div class="box warn">
+  <span class="boxTitle">একটি সীমাবদ্ধতা</span>
+  <p>Cart-এ যোগ করার সময় <em>stock যথেষ্ট আছে কি না</em> তা যাচাই করা হয় না — শুধু পণ্যটি ACTIVE কি না
+  দেখা হয়। Stock-এর প্রকৃত যাচাই হয় checkout-এর সময় (অধ্যায় 19)। ফলে ক্রেতা ১০০ কেজি cart-এ রাখতে
+  পারেন যদিও মজুদ ৪০ কেজি, এবং ত্রুটিটি কেবল checkout-এ গিয়ে দেখতে পান।</p>
+</div>
+
+
+<h1 class="chapter" id="ch19"><span class="num">19</span>Checkout ও Payment<span class="mk">[[C19]]</span></h1>
+
+<div class="box bad">
+  <span class="boxTitle">সবচেয়ে জরুরি সত্য — প্রথমেই বলে নিচ্ছি</span>
+  <p><strong>এই প্রজেক্টে কোনো প্রকৃত payment gateway নেই।</strong> bKash, Nagad, SSLCommerz, Stripe —
+  কোনোটির সাথেই সংযোগ নেই। কোনো আসল টাকা কখনো লেনদেন হয় না। enum-এর নামই সেটি স্বীকার করে:
+  <span class="mono">PaymentMethod { COD, DEMO_CARD }</span> এবং
+  <span class="mono">Payment.demoTransactionRef</span>। এটিকে কখনোই “real payment integration” বলবেন না।</p>
+</div>
+
+<h2>19.1 দুটি payment পদ্ধতি</h2>
+<table class="data">
+  <tr><th style="width:18%">পদ্ধতি</th><th style="width:22%">UI-তে লেখা</th><th style="width:20%">Payment.status</th><th>বাস্তবে কী ঘটে</th></tr>
+  <tr><td><span class="mono">DEMO_CARD</span></td><td>“Demo card (charged instantly)”</td>
+      <td><span class="mono">PAID</span>, <span class="mono">paidAt = now()</span></td>
+      <td>কোনো কার্ড নম্বর চাওয়াই হয় না; কোড সরাসরি PAID লিখে দেয় <span class="chip demo">SIMULATED</span></td></tr>
+  <tr><td><span class="mono">COD</span></td><td>“Cash on delivery”</td>
+      <td><span class="mono">PENDING</span>, <span class="mono">paidAt = null</span></td>
+      <td>বাস্তবসম্মত — হাতে হাতে টাকা নেওয়ার ধারণা। তবে পরে PAID করার কোনো ব্যবস্থা নেই
+      <span class="chip part">আংশিক</span></td></tr>
+</table>
+
+<h2>19.2 Checkout transaction — সবচেয়ে গুরুত্বপূর্ণ কোড</h2>
+<p><span class="mono">POST /api/v1/orders/{userId}/checkout</span> — এখানে ছয়টি কাজ
+<strong>একটিমাত্র ডাটাবেস transaction</strong>-এর ভিতরে হয়। অর্থাৎ হয় সবগুলো হবে, নয়তো একটিও হবে না।</p>
+
+<pre>const order = await prisma.$transaction(async (tx) =&gt; {
+  // ১. Order + সব OrderItem তৈরি (nameSnapshot ও দাম কপি করে)
+  const created = await tx.order.create({ data: { userId, totalBdt: total, …,
+        items: { create: cart.items.map(item =&gt; ({ productId, farmerId,
+                 nameSnapshot: item.product.name, quantityKg, unitPriceBdt, lineTotalBdt })) },
+        statusEvents: { create: [{ status: "PENDING", note: "Order placed" }] } } });
+
+  // ২. প্রতিটি পণ্যের মজুদ কমানো
+  for (const item of cart.items)
+    await tx.product.update({ where: { id: item.productId },
+                              data: { quantityKg: { decrement: item.quantityKg } } });
+
+  // ৩. Payment সারি
+  await tx.payment.create({ data: { orderId: created.id, method, amountBdt: total,
+        status: isDemoCardPaid ? "PAID" : "PENDING",
+        demoTransactionRef: `DEMO-${created.id.slice(0, 8)}`,
+        paidAt: isDemoCardPaid ? new Date() : null } });
+
+  // ৪. পুরস্কার পয়েন্ট
+  await tx.rewardsLedger.create({ data: { userId, points: 20, reason: "Healthy purchase" } });
+
+  // ৫. Cart খালি করা
+  await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+  return created;
+});</pre>
+
+<div class="box ok">
+  <span class="boxTitle">Transaction কেন? — ভাইভার চমৎকার উত্তর</span>
+  <p>“ধরুন order তৈরি হলো, কিন্তু stock কমানোর ঠিক আগে server বন্ধ হয়ে গেল। তাহলে একটি order থাকত
+  যার জন্য কোনো stock কাটা হয়নি — হিসাব চিরতরে ভুল হয়ে যেত। <span class="mono">$transaction</span>
+  নিশ্চিত করে যে পাঁচটি কাজই একসাথে সফল হবে, নাহলে ডাটাবেস আগের অবস্থায় ফিরে যাবে (rollback)। এটিকে
+  বলে <strong>atomicity</strong> — ACID-এর A।”</p>
+</div>
+
+<h2>19.3 Checkout-এর আগের যাচাইগুলো</h2>
+<table class="data">
+  <tr><th style="width:36%">যাচাই</th><th style="width:14%">ব্যর্থ হলে</th><th>বার্তা</th></tr>
+  <tr><td><span class="mono">requireOwnerOrRole(request, userId, ["ADMIN"])</span></td><td>403</td><td>অন্যের হয়ে checkout করা যায় না</td></tr>
+  <tr><td>Zod: ঠিকানার <span class="mono">line1</span> ও <span class="mono">city</span> আবশ্যক</td><td>422</td><td>“Delivery address is required”</td></tr>
+  <tr><td>Cart খালি কি না</td><td>400</td><td>“Your cart is empty”</td></tr>
+  <tr><td>প্রতিটি item-এর জন্য <span class="mono">product.quantityKg &lt; item.quantityKg</span></td>
+      <td><strong>409</strong></td><td>“Not enough stock for &lt;পণ্যের নাম&gt;”</td></tr>
+</table>
+
+<h2>19.4 nameSnapshot — একটি সূক্ষ্ম কিন্তু গুরুত্বপূর্ণ সিদ্ধান্ত</h2>
+<p><span class="mono">OrderItem</span>-এ পণ্যের নাম ও দাম <strong>কপি করে</strong> রাখা হয়। কেন?
+কারণ কৃষক আগামীকাল নাম বা দাম বদলাতে পারেন। কিন্তু ক্রেতার রসিদে সেই দিনের নাম ও দামই থাকা উচিত।
+এটিকে বলে <em>denormalization for historical accuracy</em> — ইচ্ছাকৃতভাবে তথ্য দুইবার রাখা, যাতে
+ইতিহাস বদলে না যায়।</p>
+
+<h2>19.5 ডেলিভারি ফি</h2>
+<p>Frontend-এ <span class="mono">const DELIVERY_FEE = 60;</span> — একটি স্থির সংখ্যা। Server-এ
+<span class="mono">deliveryFeeInput ?? 60</span>, অর্থাৎ client যা পাঠায় server তাই মেনে নেয়।
+<span class="chip part">সীমাবদ্ধতা</span> — দূরত্ব বা ওজনভিত্তিক কোনো হিসাব নেই, এবং client
+ইচ্ছে করলে ০ পাঠাতে পারে।</p>
+
+<figure class="wide">
+  <img src="shots/12-checkout" alt="Checkout page">
+  <figcaption class="caption">চিত্র 21: Checkout পেজ — বাঁয়ে ঠিকানা ও payment (demo) নির্বাচন, ডানে order summary সহ delivery fee ও মোট।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch20"><span class="num">20</span>Order Management ও Lifecycle<span class="mk">[[C20]]</span></h1>
+
+<figure class="wide">
+  <img src="diagrams/d7-order.svg" alt="Order lifecycle">
+  <figcaption class="caption">চিত্র 22: Order-এর সম্পূর্ণ জীবনচক্র — cart থেকে DELIVERED/CANCELLED পর্যন্ত।</figcaption>
+</figure>
+
+<h2>20.1 পাঁচটি OrderStatus</h2>
+<table class="data">
+  <tr><th style="width:16%">Status</th><th style="width:26%">অর্থ</th><th>কখন বসে</th></tr>
+  <tr><td><span class="mono">PENDING</span></td><td>অর্ডার দেওয়া হয়েছে, কৃষক এখনো নিশ্চিত করেননি</td><td>checkout-এ স্বয়ংক্রিয়ভাবে</td></tr>
+  <tr><td><span class="mono">CONFIRMED</span></td><td>কৃষক/admin নিশ্চিত করেছেন</td><td>হাতে পরিবর্তন করতে হয়</td></tr>
+  <tr><td><span class="mono">SHIPPED</span></td><td>পাঠিয়ে দেওয়া হয়েছে</td><td>হাতে</td></tr>
+  <tr><td><span class="mono">DELIVERED</span></td><td>ক্রেতা পেয়ে গেছেন</td><td>হাতে — <strong>এর পরেই review দেওয়া সম্ভব হয়</strong></td></tr>
+  <tr><td><span class="mono">CANCELLED</span></td><td>বাতিল</td><td>হাতে, যেকোনো পর্যায় থেকে</td></tr>
+</table>
+
+<div class="box warn">
+  <span class="boxTitle">একটি সীমাবদ্ধতা যা নিজে থেকে বলা ভালো</span>
+  <p>Status পরিবর্তনে কোনো <em>ক্রম</em> জোর করে চাপানো হয় না। অর্থাৎ
+  <span class="mono">PENDING → DELIVERED</span> সরাসরি করা যায়, এমনকি
+  <span class="mono">DELIVERED → PENDING</span>-ও যায়। একটি প্রকৃত state machine থাকলে এটি আটকানো যেত।
+  বর্তমানে শুধু enum-এর পাঁচটি মানের মধ্যে সীমাবদ্ধ থাকাটুকু যাচাই হয়।</p>
+</div>
+
+<h2>20.2 কে status বদলাতে পারে?</h2>
+<pre>// app/api/v1/orders/[id]/status/route.js
+if (session.role !== "ADMIN") {
+  const farmerProfile = await prisma.farmerProfile.findUnique({ where: { userId: session.userId } });
+  const ownsAnItem = farmerProfile &amp;&amp; order.items.some(item =&gt; item.farmerId === farmerProfile.id);
+  if (!ownsAnItem) throw new ApiError("You do not have permission to update this order", 403);
+}</pre>
+<p>অর্থাৎ ADMIN সব order বদলাতে পারে; একজন কৃষক শুধু সেই order বদলাতে পারেন যেখানে তার অন্তত একটি
+পণ্য আছে। ক্রেতা নিজের order-এর status বদলাতে পারেন না (এমনকি বাতিলও করতে পারেন না —
+<span class="chip part">সীমাবদ্ধতা</span>)।</p>
+
+<h2>20.3 OrderStatusEvent — ইতিহাসের খাতা</h2>
+<p>প্রতিবার status বদলালে একটি নতুন সারি লেখা হয়; পুরোনোটি কখনো মোছা বা সম্পাদনা হয় না:</p>
+<pre>data: { status: nextStatus,
+        statusEvents: { create: { status: nextStatus, note: parsed.data.note } } }</pre>
+<p>এটি একটি <em>append-only log</em>। ফলে <span class="mono">/orders/&lt;id&gt;</span> পেজে সম্পূর্ণ
+timeline দেখানো যায় — কখন কী হলো, কে কী নোট লিখল।</p>
+
+<h2>20.4 Reputation-এর সাথে সংযোগ</h2>
+<pre>if (nextStatus === "DELIVERED" || nextStatus === "CANCELLED") {
+  const farmerIds = [...new Set(updated.items.map(item =&gt; item.farmerId))];
+  await Promise.all(farmerIds.map(id =&gt; recomputeFarmerReputation(id)));
+}</pre>
+<p>একটি order-এ একাধিক কৃষকের পণ্য থাকতে পারে, তাই <span class="mono">Set</span> দিয়ে আলাদা আলাদা
+farmerId বের করে প্রত্যেকের reputation নতুন করে গণনা করা হয়।</p>
+
+<h2>20.5 Order দেখার তিনটি ভিন্ন দৃষ্টিকোণ</h2>
+<table class="data">
+  <tr><th style="width:14%">কে</th><th style="width:34%">Endpoint</th><th>কী দেখে</th></tr>
+  <tr><td>ক্রেতা</td><td><span class="mono">GET /api/v1/orders/{userId}</span></td><td>নিজের সব order, সর্বশেষটি আগে</td></tr>
+  <tr><td>ক্রেতা</td><td><span class="mono">GET /api/v1/orders/detail/{orderId}</span></td><td>একটি order-এর সম্পূর্ণ বিবরণ + timeline + payment</td></tr>
+  <tr><td>কৃষক</td><td><span class="mono">GET /api/v1/farmer/orders</span></td>
+      <td><strong>শুধু নিজের item</strong> — বহু-কৃষকের order থেকেও অন্যের অংশ দেখতে পান না</td></tr>
+  <tr><td>Admin</td><td><span class="mono">GET /api/v1/admin/orders</span></td><td>সব order, ক্রেতার নাম ও ইমেইল সহ</td></tr>
+</table>
+
+<div class="box ok">
+  <span class="boxTitle">কৃষকের ভিউ — একটি ভালো privacy সিদ্ধান্ত</span>
+  <p><span class="mono">farmer/orders</span> route ক্লায়েন্ট থেকে <span class="mono">farmerId</span>
+  নেয় না; সেটি session থেকে বের করে। এবং <span class="mono">OrderItem</span>-এর উপর query করে, পুরো
+  Order-এর উপর নয়। ফলে দুই কৃষকের পণ্য থাকা একটি order-এ প্রত্যেকে কেবল নিজেরটুকুই দেখেন — ক্রেতার
+  পুরো ঝুড়ি বা মোট বিল নয়।</p>
+</div>
+
+<figure class="wide">
+  <img src="shots/14-order-detail" alt="Order detail page">
+  <figcaption class="caption">চিত্র 23: Order detail (<span class="mono">/orders/&lt;id&gt;</span>) — item তালিকা, ডেলিভারি ঠিকানা এবং চারটি ধাপের status timeline।</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="shots/26-admin-orders" alt="Admin orders">
+  <figcaption class="caption">চিত্র 24: Admin order management — প্রতিটি সারিতে drop-down দিয়ে সরাসরি status পরিবর্তন করা যায়।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch21"><span class="num">21</span>Reviews &amp; Ratings<span class="mk">[[C21]]</span></h1>
+
+<h2>21.1 “শুধু যিনি কিনেছেন তিনিই লিখতে পারবেন”</h2>
+<p>এই একটি নিয়মই review ব্যবস্থাকে বিশ্বাসযোগ্য করে। এটি <strong>তিন স্তরে</strong> প্রয়োগ করা হয়েছে —
+যার যেকোনো একটি ভাঙলেও বাকিগুলো আটকে দেয়।</p>
+
+<table class="data">
+  <tr><th class="c" style="width:8%">স্তর</th><th style="width:26%">কোথায়</th><th>কী করে</th></tr>
+  <tr><td class="c">১</td><td>Frontend<br><span class="mono">ReviewsSection.js</span></td>
+      <td>form-টি কেবল তখনই render হয় যখন <span class="mono">user.role === "consumer"</span></td></tr>
+  <tr><td class="c">২</td><td>Server logic<br><span class="mono">getReviewEligibility()</span></td>
+      <td>DELIVERED order item খুঁজে দেখে, এবং আগে review দেওয়া আছে কি না দেখে</td></tr>
+  <tr><td class="c">৩</td><td>Database<br><span class="mono">Review</span> model</td>
+      <td><span class="mono">orderItemId @unique</span> + <span class="mono">@@unique([customerId, productId])</span>
+      — কোড ভুল করলেও ডাটাবেস দ্বিতীয় review ঢুকতে দেবে না</td></tr>
+  </table>
+
+<pre>// lib/server/reviews.js
+const [deliveredOrderItem, existingReview] = await Promise.all([
+  prisma.orderItem.findFirst({
+    where: { productId, order: { userId: customerId, status: "DELIVERED" } },
+    orderBy: { id: "desc" } }),
+  prisma.review.findUnique({ where: { customerId_productId: { customerId, productId } } })
+]);
+return decideEligibility({ deliveredOrderItem, alreadyReviewed: Boolean(existingReview) });
+
+// lib/server/reviewEligibility.js  (pure — টেস্ট করা যায়)
+export function decideEligibility({ deliveredOrderItem, alreadyReviewed }) {
+  if (alreadyReviewed)     return { eligible: false, reason: "already_reviewed" };
+  if (!deliveredOrderItem) return { eligible: false, reason: "not_purchased" };
+  return { eligible: true, orderItemId: deliveredOrderItem.id };
+}</pre>
+
+<h2>21.2 কেন দুটি unique constraint?</h2>
+<table class="data">
+  <tr><th style="width:34%">Constraint</th><th>কী ঠেকায়</th></tr>
+  <tr><td><span class="mono">orderItemId @unique</span></td><td>একটি নির্দিষ্ট ক্রয়ের বিপরীতে একটির বেশি review নয়</td></tr>
+  <tr><td><span class="mono">@@unique([customerId, productId])</span></td>
+      <td>একই ক্রেতা একই পণ্য পাঁচবার কিনে পাঁচটি ৫-তারা দিতে পারবেন না — অর্থাৎ
+      <em>review farming</em> আটকানো</td></tr>
+</table>
+
+<h2>21.3 Review তৈরির প্রবাহ</h2>
+<ol>
+  <li><span class="mono">POST /api/v1/reviews</span> with <span class="mono">{ product_id, rating, comment }</span></li>
+  <li><span class="mono">requireUser</span>; <span class="mono">role !== "CONSUMER"</span> হলে 403</li>
+  <li>Zod: rating অবশ্যই পূর্ণসংখ্যা ১–৫, comment সর্বোচ্চ ১০০০ অক্ষর</li>
+  <li>পণ্য আছে কি না → না থাকলে 404</li>
+  <li><span class="mono">getReviewEligibility()</span> → অযোগ্য হলে 403 এবং কারণভিত্তিক বার্তা
+      (“You have already reviewed this product” বা “You can only review products you have purchased and received”)</li>
+  <li><span class="mono">prisma.review.create()</span> — <span class="mono">farmerId</span>
+      পণ্য থেকেই নেওয়া হয়, ক্লায়েন্ট থেকে নয়</li>
+  <li><span class="mono">recomputeFarmerReputation(product.farmerId)</span></li>
+  <li><span class="mono">201</span> ফেরত</li>
+</ol>
+
+<h2>21.4 Moderation — মুছে ফেলা নয়, লুকানো</h2>
+<p>Admin <span class="mono">PATCH /api/v1/admin/reviews/{reviewId}</span> দিয়ে status
+<span class="mono">published ↔ hidden</span> করতে পারেন। Review সারিটি কখনো মুছে ফেলা হয় না।
+<span class="mono">GET /api/v1/reviews</span> সবসময় <span class="mono">where.status = "PUBLISHED"</span>
+দিয়ে filter করে, তাই hidden review জনসমক্ষে আসে না — কিন্তু ইতিহাস থেকে যায়। প্রতিটি moderation
+audit log-এ <span class="mono">review_moderated</span> হিসেবে লেখা হয়, এবং কৃষকের reputation সাথে
+সাথে নতুন করে গণনা হয় (কারণ hidden review আর গোনা হবে না)।</p>
+
+<figure class="wide">
+  <img src="shots/27-admin-reviews" alt="Admin review moderation">
+  <figcaption class="caption">চিত্র 25: Admin review moderation — তারকা, মন্তব্য, status এবং Hide/Republish বোতাম।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch22"><span class="num">22</span>Wishlist<span class="mk">[[C22]]</span></h1>
+
+<h2>22.1 মডেল</h2>
+<pre>model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String   ;  productId String
+  createdAt DateTime @default(now())
+  @@unique([userId, productId])     // একই পণ্য দুইবার নয়
+  @@index([userId])                 // "আমার wishlist" query দ্রুত করার জন্য
+}</pre>
+
+<h2>22.2 API</h2>
+<table class="data tight">
+  <tr><th style="width:9%">Method</th><th style="width:26%">Endpoint</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/api/v1/wishlist</span></td><td>নিজের সম্পূর্ণ wishlist (পণ্যের বিস্তারিত সহ)</td></tr>
+  <tr><td>POST</td><td><span class="mono">/api/v1/wishlist</span></td><td><span class="mono">upsert</span> — বারবার চাপলেও ত্রুটি হয় না</td></tr>
+  <tr><td>GET</td><td><span class="mono">/api/v1/wishlist/{productId}</span></td><td><span class="mono">{ wishlisted: true/false }</span> — হার্ট আইকনের অবস্থার জন্য</td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/api/v1/wishlist/{productId}</span></td><td>সরিয়ে ফেলা</td></tr>
+</table>
+
+<div class="box ok">
+  <span class="boxTitle">একটি চমৎকার নিরাপত্তা নকশা</span>
+  <p>লক্ষ্য করুন — কোনো endpoint-এ <span class="mono">userId</span> নেই। প্রতিটি route সবসময়
+  <span class="mono">session.userId</span> ব্যবহার করে। ফলে “অন্যের wishlist দেখা” চেষ্টা করার
+  উপায়ই থাকে না — কোনো id পাঠানোর জায়গাই নেই। কোডের কমেন্টে লেখা:
+  <em>“always scoped to the authenticated session, never to a client-supplied user id.”</em></p>
+</div>
+
+<figure class="wide">
+  <img src="shots/15-wishlist" alt="Wishlist page">
+  <figcaption class="caption">চিত্র 26: Wishlist পেজ — সংরক্ষিত পণ্যের card ও “Remove” বোতাম।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch23"><span class="num">23</span>Rewards (পুরস্কার পয়েন্ট)<span class="mk">[[C23]]</span></h1>
+
+<h2>23.1 RewardsLedger</h2>
+<p>একটি <em>ledger</em> (খতিয়ান) — অর্থাৎ ব্যবহারকারীর উপর একটি “points” কলাম না রেখে প্রতিটি
+অর্জনকে আলাদা সারি হিসেবে রাখা হয়। মোট পয়েন্ট প্রতিবার যোগ করে বের করা হয়।</p>
+<pre>const points = ledgerEntries.reduce((sum, entry) =&gt; sum + entry.points, 0);</pre>
+<p>সুবিধা — কখন, কেন পয়েন্ট পেয়েছেন তার পূর্ণ ইতিহাস থাকে; শুধু একটি যোগফল থাকলে সেটি হারিয়ে যেত।</p>
+
+<h2>23.2 পয়েন্ট কোথা থেকে আসে? (মাত্র দুটি উৎস)</h2>
+<table class="data">
+  <tr><th style="width:30%">ঘটনা</th><th class="c" style="width:14%">পয়েন্ট</th><th>reason</th></tr>
+  <tr><td>Checkout সম্পন্ন</td><td class="c">+20</td><td><span class="mono">"Healthy purchase"</span></td></tr>
+  <tr><td><span class="mono">POST /api/v1/nutrition/log</span></td><td class="c">+8</td><td><span class="mono">"Meal log"</span></td></tr>
+</table>
+
+<h2>23.3 Badge</h2>
+<p>পাঁচটি badge, পয়েন্টের সীমা পেরোলেই স্বয়ংক্রিয়ভাবে অর্জিত হয়: First Harvest (১০০),
+Organic Warrior (৫০০), 7-Day Streak (১০০০), Zero Pesticide Week (২৫০০), Health Champion (৫০০০)।</p>
+
+<div class="box warn">
+  <span class="boxTitle">দুটি সৎ স্বীকারোক্তি</span>
+  <p>(১) <strong>“Streak” আসলে streak নয়।</strong> কোডে এটি গণনা হয় এভাবে —
+  <span class="mono">new Set(entries.map(e =&gt; new Date(e.createdAt).toDateString())).size</span>।
+  অর্থাৎ এটি <em>কতগুলো আলাদা দিনে</em> পয়েন্ট পেয়েছেন তার সংখ্যা, টানা কত দিন নয়।
+  তাই UI-তে লেখা আছে “Distinct active days”, “streak” নয়।
+  (২) পয়েন্ট দিয়ে <strong>কিছুই কেনা যায় না</strong> — কোনো redemption ব্যবস্থা নেই।</p>
+</div>
+
+<figure class="wide">
+  <img src="shots/16-rewards" alt="Rewards page">
+  <figcaption class="caption">চিত্র 27: Rewards পেজ — মোট পয়েন্ট, আলাদা সক্রিয় দিনের সংখ্যা, পরবর্তী badge-এর অগ্রগতি এবং সাম্প্রতিক কার্যক্রম।</figcaption>
+</figure>

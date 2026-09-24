@@ -1,0 +1,382 @@
+<!--PART:ভাগ জ — Frontend, Backend, Data Flow ও ডেমো মডিউল-->
+<h1 class="chapter" id="ch32"><span class="num">32</span>Frontend Architecture<span class="mk">[[C32]]</span></h1>
+
+<h2>32.1 App Router — ফোল্ডারই রাউট</h2>
+<p>Next.js-এর App Router-এ <span class="mono">app/</span>-এর প্রতিটি ফোল্ডার একটি URL, আর সেই ফোল্ডারের
+<span class="mono">page.js</span> ফাইলটিই সেই পেজ। <span class="mono">[productId]</span>-এর মতো বর্গাকার
+বন্ধনী মানে dynamic segment।</p>
+<table class="data tight">
+  <tr><th style="width:26%">ফাইল</th><th>URL / ভূমিকা</th></tr>
+  <tr><td><span class="mono">app/layout.js</span></td><td>মূল কাঠামো — <span class="mono">&lt;html&gt;</span>, Navbar, Footer, LanguageRuntime</td></tr>
+  <tr><td><span class="mono">app/page.js</span></td><td><span class="mono">/</span> — হোমপেজ</td></tr>
+  <tr><td><span class="mono">app/marketplace/page.js</span></td><td><span class="mono">/marketplace</span></td></tr>
+  <tr><td><span class="mono">app/marketplace/[productId]/page.js</span></td><td><span class="mono">/marketplace/:id</span></td></tr>
+  <tr><td><span class="mono">app/farmer/layout.js</span></td><td><span class="mono">/farmer/*</span>-এ RoleGuard মোড়ক</td></tr>
+  <tr><td><span class="mono">app/admin/layout.js</span></td><td><span class="mono">/admin/*</span>-এ RoleGuard + AdminNav (login বাদে)</td></tr>
+  <tr><td><span class="mono">app/account/layout.js</span></td><td><span class="mono">/account</span>-এ consumer guard</td></tr>
+  <tr><td><span class="mono">app/globals.css</span></td><td>সম্পূর্ণ CSS — কোনো CSS framework ব্যবহার করা হয়নি</td></tr>
+</table>
+
+<h2>32.2 Server Component বনাম Client Component</h2>
+<table class="data">
+  <tr><th style="width:24%">ধরন</th><th style="width:30%">কীভাবে চেনা যায়</th><th>এই প্রজেক্টে কোথায়</th></tr>
+  <tr><td><strong>Server Component</strong><br>(ডিফল্ট)</td>
+      <td>ফাইলের শুরুতে <span class="mono">"use client"</span> <em>নেই</em>; প্রায়ই <span class="mono">async function</span></td>
+      <td><span class="mono">app/page.js</span> (হোম) · <span class="mono">marketplace/[productId]</span> ·
+      <span class="mono">trace/[productId]</span> · <span class="mono">farmers/[farmerId]</span></td></tr>
+  <tr><td><strong>Client Component</strong></td>
+      <td>প্রথম লাইনে <span class="mono">"use client"</span></td>
+      <td>যেখানেই <span class="mono">useState</span>, <span class="mono">useEffect</span> বা ক্লিক লাগে —
+      marketplace তালিকা, cart, checkout, সব dashboard, সব form</td></tr>
+</table>
+<p><strong>কেন এই ভাগ?</strong> Server Component-এর JavaScript ব্রাউজারে পাঠানোই হয় না, তাই পেজ হালকা ও
+দ্রুত হয় এবং HTML-এ সব লেখা থাকায় SEO ভালো হয়। কিন্তু সেখানে state বা event handler রাখা যায় না —
+সেজন্যই interaction-নির্ভর অংশগুলো client component।</p>
+
+<h2>32.3 পুনর্ব্যবহারযোগ্য component</h2>
+<table class="data tight">
+  <tr><th style="width:30%">Component</th><th>দায়িত্ব</th></tr>
+  <tr><td><span class="mono">ui/Navbar.js</span></td><td>শীর্ষ নেভিগেশন, ভাষা toggle, login/logout, মোবাইল hamburger</td></tr>
+  <tr><td><span class="mono">ui/Footer.js</span></td><td>তিন অংশের footer</td></tr>
+  <tr><td><span class="mono">ui/BrandLogo.js</span></td><td>লোগোর একমাত্র উৎস — header ও footer দুটোই এটিই ব্যবহার করে</td></tr>
+  <tr><td><span class="mono">RoleGuard.js</span></td><td>রোল অনুযায়ী পেজ রক্ষা (UI স্তর)</td></tr>
+  <tr><td><span class="mono">auth/AuthForm.js</span></td><td>login ও register — তিনটি দরজাতেই একই form</td></tr>
+  <tr><td><span class="mono">auth/useSession.js</span></td><td>localStorage থেকে session পড়া; custom event দিয়ে সব component-কে জানানো</td></tr>
+  <tr><td><span class="mono">cart/useCart.js</span></td><td>cart-এর সব কাজ এক hook-এ</td></tr>
+  <tr><td><span class="mono">cart/AddToCartButton.js</span></td><td>idle → loading → “Added” অবস্থা</td></tr>
+  <tr><td><span class="mono">products/ProductImage.js</span></td><td>ছবি বা fallback টাইল — সব পেজে একই আচরণ</td></tr>
+  <tr><td><span class="mono">products/ProductImageUploader.js</span></td><td>আপলোড, preview, Replace/Remove</td></tr>
+  <tr><td><span class="mono">products/FarmerProductRow.js</span></td><td>কৃষকের পণ্যের সারি + inline edit + archive</td></tr>
+  <tr><td><span class="mono">reviews/ReviewsSection.js</span></td><td>review তালিকা ও form</td></tr>
+  <tr><td><span class="mono">wishlist/WishlistButton.js</span></td><td>হার্ট আইকন toggle</td></tr>
+  <tr><td><span class="mono">orders/StatusTimeline.js</span></td><td>order-এর ধাপ দেখানো</td></tr>
+  <tr><td><span class="mono">trace/TraceEventForm.js</span>, <span class="mono">FarmerTraceControls.js</span></td><td>trace event যোগ করার form</td></tr>
+  <tr><td><span class="mono">admin/AdminNav.js</span></td><td>admin-এর আটটি ট্যাব</td></tr>
+  <tr><td><span class="mono">i18n/LanguageRuntime.js</span>, <span class="mono">LanguageToggle.js</span></td><td>বাংলা/ইংরেজি পরিবর্তন</td></tr>
+</table>
+
+<h2>32.4 State ব্যবস্থাপনা</h2>
+<p>Redux, Zustand বা Context API — কোনো state library ব্যবহার করা হয়নি। তিনটি সহজ কৌশলই যথেষ্ট ছিল:</p>
+<ol>
+  <li><strong>স্থানীয় <span class="mono">useState</span></strong> — form, loading, error।</li>
+  <li><strong>Custom hook</strong> — <span class="mono">useSession()</span> ও
+      <span class="mono">useCart()</span> ভাগ করা logic ধরে রাখে।</li>
+  <li><strong>Browser event</strong> — login/logout হলে
+      <span class="mono">window.dispatchEvent(new Event("fairharvest:session"))</span>; প্রতিটি
+      <span class="mono">useSession()</span> সেটি শুনে নিজেকে হালনাগাদ করে। Navbar তাই সাথে সাথে বদলায়।</li>
+</ol>
+
+<h2>32.5 API-র সাথে যোগাযোগ</h2>
+<pre>// lib/api.js — একটিই request helper
+const API_ROOT = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+
+async function request(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (typeof window !== "undefined") {
+    const token = window.localStorage.getItem("fairHarvestToken");
+    if (token) headers.Authorization = `Bearer ${token}`;      // স্বয়ংক্রিয়ভাবে যুক্ত
+  }
+  const response = await fetch(`${API_ROOT}${path}`, { ...options, headers, cache: "no-store" });
+  const body = await response.json().catch(() =&gt; ({ success: false, message: "Invalid API response" }));
+  if (!response.ok) {
+    if (response.status === 401 &amp;&amp; typeof window !== "undefined") window.location.href = "/auth";
+    throw new Error(body.message || "Request failed");
+  }
+  return body.data;      // খাম খুলে শুধু data ফেরত
+}</pre>
+<p>এই একটিমাত্র ফাংশনের উপর ৫০-এর বেশি নামকরা helper তৈরি করা হয়েছে
+(<span class="mono">getProducts</span>, <span class="mono">checkout</span>,
+<span class="mono">archiveProduct</span> …), তাই কোনো component-কে কখনো URL বা header নিয়ে ভাবতে হয় না।</p>
+<p><span class="mono">cache: "no-store"</span> গুরুত্বপূর্ণ — নাহলে Next.js পুরোনো উত্তর cache করে
+রাখত এবং cart বা order-এর সংখ্যা পুরোনো দেখাত।</p>
+
+<h2>32.6 Responsive design</h2>
+<p>কোনো CSS framework নেই; <span class="mono">app/globals.css</span>-এ হাতে লেখা media query
+ব্যবহার করা হয়েছে। প্রধান breakpoint: <span class="mono">767px</span> (মোবাইল),
+<span class="mono">768–1280px</span> (ট্যাবলেট)। Header-এর উচ্চতা একটি CSS variable
+(<span class="mono">--header-h</span>) দিয়ে নিয়ন্ত্রিত, আর লোগোর আকার
+<span class="mono">clamp(36px, 11vw, 56px)</span> দিয়ে পর্দার সাথে মানিয়ে নেয়।</p>
+
+
+<h1 class="chapter" id="ch33"><span class="num">33</span>Backend Architecture<span class="mk">[[C33]]</span></h1>
+
+<h2>33.1 একটি request-এর ভিতরের যাত্রা</h2>
+<pre>Browser
+  │  fetch("/api/v1/products", { method:"POST", Authorization:"Bearer …" })
+  ▼
+middleware.js ─────────── CORS: Origin অনুমোদিত তালিকায় আছে কি?
+  ▼
+app/api/v1/products/route.js  →  export async function POST(request)
+  ▼
+handleRoute(async () =&gt; {            ← সব ত্রুটি এখানে ধরা পড়ে
+     requireUser(request)             ← ১. তুমি কে?  (401)
+     enforceRateLimit(...)            ← ২. খুব বেশি বার? (429)
+     schema.safeParse(body)           ← ৩. ইনপুট ঠিক আছে? (422)
+     prisma.farmerProfile.findUnique  ← ৪. বস্তুটি আছে? (404)
+     ownership / verification check   ← ৫. অনুমতি আছে? (403)
+     prisma.product.create(...)       ← ৬. আসল কাজ
+     recordAudit(...)                 ← ৭. প্রমাণ রাখা (ঐচ্ছিক)
+     return ok(toPublicProduct(...))  ← ৮. serializer দিয়ে উত্তর
+  })
+  ▼
+{ success: true, data: {...}, message: "Product listed" }   HTTP 201</pre>
+
+<p>এই ক্রমটি প্রায় সব route-এ একই, এবং ক্রমটি ইচ্ছাকৃত — <strong>সবচেয়ে সস্তা যাচাই আগে</strong>।
+কে তুমি (টোকেন পড়া, কোনো DB call নেই) → কতবার (memory lookup) → ইনপুট (CPU) → তারপর সবচেয়ে
+ব্যয়বহুল ডাটাবেস query।</p>
+
+<h2>33.2 কোন ফাইল কী করে</h2>
+<table class="data tight">
+  <tr><th style="width:28%">ফাইল</th><th style="width:26%">গুরুত্বপূর্ণ ফাংশন</th><th>কেন আছে</th></tr>
+  <tr><td><span class="mono">lib/server/db.js</span></td><td><span class="mono">prisma</span></td><td>একটিই Prisma Client, hot-reload-এ পুনর্ব্যবহার</td></tr>
+  <tr><td><span class="mono">lib/server/auth.js</span></td><td><span class="mono">hashPassword, verifyPassword, signToken, decodeToken, requireUser, requireRole, requireOwnerOrRole</span></td>
+      <td>authentication ও authorization-এর একমাত্র উৎস</td></tr>
+  <tr><td><span class="mono">lib/server/respond.js</span></td><td><span class="mono">ok, fail, handleRoute</span></td><td>একক response আকার ও কেন্দ্রীয় ত্রুটি ব্যবস্থাপনা</td></tr>
+  <tr><td><span class="mono">lib/server/apiError.js</span></td><td><span class="mono">ApiError</span></td>
+      <td>ইচ্ছাকৃতভাবে <span class="mono">next/server</span>-মুক্ত, যাতে rateLimit-এর মতো module টেস্ট করা যায়</td></tr>
+  <tr><td><span class="mono">lib/server/rateLimit.js</span></td><td><span class="mono">enforceRateLimit</span></td><td>অপব্যবহার প্রতিরোধ</td></tr>
+  <tr><td><span class="mono">lib/server/audit.js</span></td><td><span class="mono">recordAudit</span></td><td>best-effort লগ, কখনো request ব্যর্থ করে না</td></tr>
+  <tr><td><span class="mono">lib/server/mask.js</span></td><td><span class="mono">maskIdentifier</span></td><td>NID ও card নম্বর কখনো পুরো না পাঠানো</td></tr>
+  <tr><td><span class="mono">lib/server/serializers.js</span></td><td><span class="mono">toPublicUser, toPublicProduct, toPublicCart, toPublicOrder, toAdminFarmer, toPublicTrace…</span></td>
+      <td>ডাটাবেস মডেল → API আকার; <span class="mono">passwordHash</span> কখনো বাইরে যায় না</td></tr>
+  <tr><td><span class="mono">lib/server/reputation.js</span></td><td><span class="mono">computeReputation, badgeForScore</span></td><td>pure — টেস্টযোগ্য</td></tr>
+  <tr><td><span class="mono">lib/server/reputationSync.js</span></td><td><span class="mono">getFarmerReputationBreakdown, recomputeFarmerReputation</span></td>
+      <td>একটি শুধু পড়ে, অন্যটি লেখে — GET route-এ যেন কিছু লেখা না হয়</td></tr>
+  <tr><td><span class="mono">lib/server/reviews.js</span> + <span class="mono">reviewEligibility.js</span></td>
+      <td><span class="mono">getReviewEligibility, decideEligibility</span></td><td>DB অংশ ও সিদ্ধান্ত অংশ আলাদা</td></tr>
+  <tr><td><span class="mono">lib/server/earnings.js</span></td><td><span class="mono">summarizeEarnings</span></td><td>pure; “payout” শব্দ ব্যবহার না করা নিশ্চিত করে</td></tr>
+  <tr><td><span class="mono">lib/server/verification/</span></td><td><span class="mono">verifyFarmerCard</span></td><td>provider abstraction</td></tr>
+  <tr><td><span class="mono">lib/server/storage/</span></td><td><span class="mono">putObject, getObject, deleteObject, storageKeyFromUrl</span></td><td>একই ধরনের provider abstraction</td></tr>
+  <tr><td><span class="mono">lib/server/heuristics/nutrition.js</span></td><td><span class="mono">computeDailyCalories…</span></td><td>demo পুষ্টি সূত্র</td></tr>
+</table>
+
+<h2>33.3 কেন আলাদা backend server নেই?</h2>
+<table class="data">
+  <tr><th style="width:30%">সুবিধা</th><th>ব্যাখ্যা</th></tr>
+  <tr><td>একটিই deploy</td><td>একবার push করলেই frontend ও backend দুটোই হালনাগাদ হয়</td></tr>
+  <tr><td>CORS সমস্যা নেই</td><td>একই origin, তাই ব্রাউজারের cross-origin বাধা নেই</td></tr>
+  <tr><td>কোড ভাগাভাগি</td><td><span class="mono">serializers.js</span>-এর আকার frontend-ও ব্যবহার করতে পারে</td></tr>
+  <tr><td>এক জায়গায় environment variable</td><td>দুটি প্রজেক্টে দুবার সেট করতে হয় না</td></tr>
+  <tr><td>খরচ</td><td>একটি Vercel প্রজেক্ট, একটি ডাটাবেস</td></tr>
+</table>
+<p><strong>অসুবিধা</strong> (সৎভাবে): frontend ও backend আলাদাভাবে scale করা যায় না, এবং অন্য
+কোনো ক্লায়েন্ট (যেমন মোবাইল অ্যাপ) এই একই deployment-এর উপর নির্ভরশীল হয়ে পড়ে। সেই কারণেই
+আলাদা SDK প্যাকেজটি রাখা হয়েছে — API-র contract যাতে স্পষ্ট থাকে।</p>
+
+
+<h1 class="chapter" id="ch34"><span class="num">34</span>সম্পূর্ণ Data Flow<span class="mk">[[C34]]</span></h1>
+
+<p>প্রতিটি প্রবাহ একই ছাঁচে: <strong>ব্যবহারকারীর কাজ → Frontend → API → যাচাই → ডাটাবেস/Storage →
+উত্তর → UI</strong>।</p>
+
+<h2>A. কৃষক নিবন্ধন</h2>
+<pre>Form (/auth/farmer, mode=register) → register() → POST /auth/register
+  → rate limit 6/min → Zod (role ∈ consumer|farmer) → email unique? (409 না হলে)
+  → bcrypt.hash(password, 10) → User.create + FarmerProfile.create({})
+  → signToken() → { access_token, user } → localStorage → /farmer/dashboard</pre>
+
+<h2>B. Farmer Card যাচাই</h2>
+<pre>Form (/farmer/verify) → verifyFarmerCard() → POST /farmers/{id}/verify
+  → rate limit 8/min → requireOwnerOrRole → Zod
+  → verifyFarmerCard() → demoRegistryProvider → GovFarmerCardRecord lookup
+  → FarmerProfile.update(status/method/verifiedAt) → recomputeFarmerReputation()
+  → getMe() → localStorage সতেজ → dashboard unlock</pre>
+
+<h2>C. Admin অনুমোদন</h2>
+<pre>/admin/verification → approve() → POST /admin/farmers/{id}/verification/approve
+  → requireRole(["ADMIN"]) → FarmerProfile.update(VERIFIED, MANUAL, verifiedByAdminId)
+  → recordAudit("farmer_verification_approved") → load() → queue রিফ্রেশ</pre>
+
+<h2>D. ছবি আপলোড ও পণ্য তৈরি</h2>
+<pre>file input → uploadProductImage(file) → POST /uploads/product-image (multipart)
+  → requireUser → rate limit 20/min → VERIFIED farmer? → validateImageUpload(MIME, size)
+  → byte দ্বিতীয়বার যাচাই → buildStorageKey(products/&lt;uuid&gt;.jpg)
+  → putObject() → [local disk | Vercel Blob] → { image_url }
+                                   │
+Add product form ─────────────────►│ POST /products { …, image_url }
+  → verification gate → Product.create → 201 → তালিকা রিফ্রেশ</pre>
+
+<h2>E. Marketplace ব্রাউজিং</h2>
+<pre>useEffect([filters]) → getProducts(filters) → GET /products?category=&amp;min_trust=&amp;max_price=
+  → where তৈরি (farmer_id না থাকলে status=ACTIVE) → findMany(include farmer.user)
+  → orderBy trustScore desc → toPublicProduct[] → setProducts → card grid
+  → (search box শুধু client-side ফিল্টার করে)</pre>
+
+<h2>F. Cart-এ যোগ</h2>
+<pre>AddToCartButton → useCart.addItem() → login? না হলে /auth/customer
+  → POST /cart/{userId}/items → requireOwnerOrRole
+  → product ACTIVE? (না হলে 404) → cart.upsert
+  → একই (cart, product, source) থাকলে quantity যোগ, নাহলে নতুন CartItem
+  → refresh() → GET /cart/{userId} → subtotal server-এ গোনা</pre>
+
+<h2>G. Checkout, Payment ও Order</h2>
+<pre>/checkout submit → checkout(user.id, {address, fee, method}) → POST /orders/{id}/checkout
+  → requireOwnerOrRole → Zod → cart খালি? (400) → প্রতিটি item-এর stock যাচাই (409)
+  → $transaction:
+       Order.create + OrderItem[] (nameSnapshot, দাম কপি) + OrderStatusEvent(PENDING)
+       প্রতিটি Product.quantityKg decrement
+       Payment.create (DEMO_CARD → PAID, COD → PENDING)
+       RewardsLedger.create(+20)
+       CartItem.deleteMany
+  → 201 → window.location = /orders/{orderId}</pre>
+
+<h2>H. Order status পরিবর্তন</h2>
+<pre>Admin drop-down বা কৃষক → PATCH /orders/{orderId}/status
+  → requireUser → ADMIN? নাহলে এই order-এ নিজের item আছে কি? (403)
+  → Zod (৫টি status) → Order.update + নতুন OrderStatusEvent
+  → DELIVERED বা CANCELLED হলে: Set(farmerIds).map(recomputeFarmerReputation)</pre>
+
+<h2>I. Review ও Reputation</h2>
+<pre>ReviewsSection submit → POST /reviews
+  → requireUser → role CONSUMER? (403) → Zod (rating 1–5)
+  → Product আছে? (404) → getReviewEligibility(customerId, productId)
+       ├─ DELIVERED OrderItem খোঁজা
+       └─ আগের review আছে? → already_reviewed / not_purchased → 403
+  → Review.create(orderItemId ← eligibility) → recomputeFarmerReputation(farmerId)
+  → 201 → তালিকা রিফ্রেশ → farmer-এর badge বদলে যেতে পারে</pre>
+
+<h2>J. Trace event</h2>
+<pre>TraceEventForm → POST /trace/{productId} → requireUser
+  → ADMIN বা মালিক কৃষক? (403) → Zod (stage, note ≤500, GPS সীমা)
+  → TraceEvent.create → পুনরায় লোড → toPublicTrace()
+  → ছয়টি ধাপের মধ্যে সম্পন্নগুলো completed:true, বাকিগুলো Pending</pre>
+
+<h2>K. পণ্য Archive</h2>
+<pre>Archive বোতাম → window.confirm → না বললে থেমে যায়
+  → DELETE /products/{id} → requireUser → rate limit 20/min
+  → assertOwnerOrAdmin → Product.update({ status: "ARCHIVED" })
+  → recordAudit("product_archived", { previousStatus, farmerId })
+  → marketplace থেকে অদৃশ্য; order, review, trace অক্ষত</pre>
+
+<h2>L. Audit log পড়া</h2>
+<pre>/admin/audit-log → GET /admin/audit-log → requireRole(["ADMIN"])
+  → auditLog.findMany({ orderBy: createdAt desc, take: 200 })
+  → metadata JSON.parse → টেবিল</pre>
+
+
+<h1 class="chapter" id="ch35"><span class="num">35</span>ভাষা পরিবর্তন (i18n) ও অন্যান্য মডিউল<span class="mk">[[C35]]</span></h1>
+
+<h2>35.1 বাংলা/ইংরেজি toggle</h2>
+<p>Header-এ EN / BN বোতাম দুটি <span class="mono">localStorage</span>-এ
+<span class="mono">fairHarvestLanguage</span> লিখে একটি custom event ছাড়ে।
+<span class="mono">LanguageRuntime.js</span> সেটি শুনে পুরো পেজের লেখা বদলে দেয়।</p>
+
+<p><strong>কৌশলটি অস্বাভাবিক</strong> — সাধারণ i18n library-র মতো
+<span class="mono">t("key")</span> ব্যবহার না করে এটি DOM-এর text node ঘুরে ঘুরে ইংরেজি লেখা খুঁজে
+বাংলা বসিয়ে দেয়, এবং <span class="mono">MutationObserver</span> দিয়ে নতুন যোগ হওয়া অংশেও একই কাজ করে।
+আসল লেখা <span class="mono">WeakMap</span>-এ রাখা হয়, যাতে আবার ইংরেজিতে ফেরা যায়।</p>
+
+<table class="data">
+  <tr><th style="width:26%">দিক</th><th>মূল্যায়ন</th></tr>
+  <tr><td>সুবিধা</td><td>একটিও component বদলাতে হয়নি — পুরো অ্যাপে কাজ করে</td></tr>
+  <tr><td>অসুবিধা ১</td><td>শুধু হুবহু মিলে যাওয়া বাক্যই অনুবাদ হয়; অভিধানে না থাকলে ইংরেজিই থেকে যায়
+      (বর্তমানে ১৭৭টি এন্ট্রি) <span class="chip part">আংশিক অনুবাদ</span></td></tr>
+  <tr><td>অসুবিধা ২</td><td>ডাটাবেস থেকে আসা লেখা (পণ্যের নাম, বিবরণ) অনুবাদ হয় না — হওয়া উচিতও নয়</td></tr>
+  <tr><td>অসুবিধা ৩</td><td>DOM ঘুরে দেখা React-এর নিজস্ব render-এর সাথে সংঘর্ষ করতে পারে; সেজন্যই
+      একটি <span class="mono">isApplying</span> পতাকা ও ৩০ms-এর debounce রাখা হয়েছে</td></tr>
+</table>
+
+<h2>35.2 অন্যান্য পেজ</h2>
+<table class="data">
+  <tr><th style="width:18%">পেজ</th><th style="width:30%">কী করে</th><th>অবস্থা</th></tr>
+  <tr><td><span class="mono">/scan</span></td><td>ক্যামেরা বা ছবি আপলোড করে “freshness” ও “chemical risk” দেখায়;
+      সর্বশেষ ৩টি ফলাফল localStorage-এ রাখে</td>
+      <td><span class="chip demo">DEMO</span> — ছবি সার্ভারে বিশ্লেষণই হয় না; পণ্যের <em>নামের</em> hash থেকে সংখ্যা</td></tr>
+  <tr><td><span class="mono">/nutrition</span></td><td>বয়স, ওজন, রোগ ও লক্ষ্য নিয়ে ৭ দিনের meal plan</td>
+      <td><span class="chip demo">DEMO</span> — সূত্র ও স্থির তালিকা, কোনো AI মডেল নেই</td></tr>
+  <tr><td><span class="mono">/rewards</span></td><td>পয়েন্ট ও badge</td><td><span class="chip impl">সত্যিকারের ডেটা</span> (RewardsLedger থেকে)</td></tr>
+  <tr><td><span class="mono">/health</span>, <span class="mono">/ready</span></td><td>Liveness ও readiness probe</td><td><span class="chip impl">কার্যকর</span></td></tr>
+  <tr><td><span class="mono">/openapi.json</span></td><td>API-র সারাংশ নথি</td><td><span class="chip part">হাতে লেখা, একটি method ভুল</span></td></tr>
+</table>
+
+<h2>35.3 SDK প্যাকেজ</h2>
+<p><span class="mono">fair-harvest-sdk/src/index.js</span> — একটি <span class="mono">FairHarvestClient</span>
+class, যেখানে <span class="mono">baseUrl</span>, <span class="mono">accessToken</span> ও
+<span class="mono">fetchImpl</span> দেওয়া যায়। এটি প্রতিটি উত্তরে <span class="mono">{success, data, message}</span>
+খাম আছে কি না যাচাই করে — না থাকলে ত্রুটি ছোড়ে।</p>
+<p>হোমপেজ এই SDK দিয়েই ১৬টি module-এর ডেটা আনার চেষ্টা করে, এবং প্রতিটির জন্য একটি fallback রাখে
+(<span class="mono">safeApi()</span>)। Build-এর সময় অ্যাপ নিজেই নিজের HTTP endpoint-এ পৌঁছাতে পারে না,
+তাই server-side-এ relative base থাকলে সরাসরি fallback ব্যবহার হয় — এই সমাধানটিই Vercel-এর
+“homepage took more than 60 seconds” build ত্রুটি ঠিক করেছিল।</p>
+<pre>const REQUEST_TIMEOUT_MS = 5000;
+function fetchWithTimeout(input, init = {}) {
+  return fetch(input, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+}
+export async function safeApi(call, fallback) {
+  if (isServer &amp;&amp; !hasAbsoluteBase) return fallback;   // build-এ ঝুলে থাকা ঠেকায়
+  try { return await call(); } catch { return fallback; }
+}</pre>
+
+
+<h1 class="chapter" id="ch36"><span class="num">36</span>Demo / Simulated মডিউল — সম্পূর্ণ সৎ তালিকা<span class="mk">[[C36]]</span></h1>
+
+<div class="box bad">
+  <span class="boxTitle">এই অধ্যায়টি সবচেয়ে বেশি নম্বর এনে দিতে পারে</span>
+  <p>ভাইভা বোর্ড দুর্বলতা খোঁজেন না — তাঁরা দেখতে চান আপনি নিজের প্রজেক্ট কতটা বোঝেন। নিজে থেকে
+  “এই অংশটি এখনো demo” বলতে পারা মানেই আপনি জানেন কোথায় কী আছে। লুকিয়ে ধরা পড়ার চেয়ে এটি
+  অনেক ভালো।</p>
+</div>
+
+<table class="data">
+  <tr><th style="width:20%">মডিউল</th><th style="width:34%">বাস্তবে কী করে</th><th>UI-তে স্বীকার করা আছে?</th></tr>
+  <tr><td><strong>Payment</strong></td>
+      <td>কোনো gateway নেই। <span class="mono">DEMO_CARD</span> সাথে সাথে PAID লিখে দেয়;
+      <span class="mono">demoTransactionRef</span> = <span class="mono">"DEMO-" + id.slice(0,8)</span>।
+      কার্ড নম্বর চাওয়াই হয় না।</td>
+      <td>হ্যাঁ — checkout-এ লেখা “Payment (demo)” ও “Demo card (charged instantly)”</td></tr>
+  <tr><td><strong>Government API</strong></td>
+      <td>নিজের ডাটাবেসের <span class="mono">GovFarmerCardRecord</span> টেবিলে খোঁজা হয়।
+      <span class="mono">officialGovApiProvider.js</span> লেখা আছে কিন্তু কোনো প্রকৃত endpoint নেই।</td>
+      <td>হ্যাঁ — verify পেজে লেখা “the <strong>demo</strong> Government Farmer Card registry”</td></tr>
+  <tr><td><strong>Voice / বাংলা কণ্ঠ</strong></td>
+      <td>সবসময় একই বাক্য ফেরত দেয়: <em>“আমার পালং শাকের দাম ১২০ টাকা কেজি”</em>। কোনো অডিও
+      প্রক্রিয়াই হয় না, দামও বদলায় না।</td>
+      <td>হ্যাঁ — “Demo only — uses a canned transcript, not real speech-to-text”</td></tr>
+  <tr><td><strong>Food scanner</strong></td>
+      <td>ছবি পাঠানো হয় কিন্তু ব্যবহার হয় না; পণ্যের নামের hash থেকে
+      <span class="mono">70 + (hash % 26)</span> দিয়ে freshness বানানো হয়।</td>
+      <td>আংশিক — “AI Tools” লেখা থাকলেও পেজে স্পষ্ট দাবিত্যাগ নেই <span class="chip part">উন্নতির সুযোগ</span></td></tr>
+  <tr><td><strong>Nutrition AI</strong></td>
+      <td>BMR সূত্র + রোগভিত্তিক স্থির খাবার তালিকা + ৩টি meal combo ঘুরিয়ে ৭ দিন।</td>
+      <td>হোমপেজের ব্যানারে স্বীকার করা আছে</td></tr>
+  <tr><td><strong>Health prediction</strong></td>
+      <td><span class="mono">(glucose−80)×0.8 + (systolic−110)×0.5</span> — একটি রৈখিক সূত্র।</td>
+      <td>হোমপেজের ব্যানারে</td></tr>
+  <tr><td><strong>DNA diet</strong></td><td>দুটি <span class="mono">if</span>: lactose → দুধ বাদ, gluten → গম বাদ।</td><td>হোমপেজের ব্যানারে</td></tr>
+  <tr><td><strong>Soil nutrients</strong></td><td>pH, nitrogen, iron থেকে গড়; কোনো প্রকৃত মাটি পরীক্ষা নেই।</td><td>হোমপেজের ব্যানারে</td></tr>
+  <tr><td><strong>Waste donation</strong></td><td>kg × 2.4 = meals, kg × 1.9 = CO₂; ডাটাবেসে কিছুই লেখা হয় না।</td><td>হোমপেজের ব্যানারে</td></tr>
+  <tr><td><strong>Doctor consultation</strong></td><td>শুধু <span class="mono">{status:"requested"}</span> echo করে।</td><td>হোমপেজের ব্যানারে</td></tr>
+  <tr><td><strong>Auto delivery</strong></td><td>শুধু <span class="mono">{status:"scheduled"}</span> echo করে।</td><td>হোমপেজের ব্যানারে</td></tr>
+  <tr><td><strong>Nearby farms</strong></td>
+      <td>শীর্ষ ১০ verified কৃষক; <span class="mono">distance_km = 3 + index × 2.4</span> —
+      অর্থাৎ দূরত্ব তালিকার ক্রম থেকে বানানো, কোনো GPS হিসাব নয়।</td>
+      <td>না <span class="chip part">উন্নতির সুযোগ</span></td></tr>
+  <tr><td><strong>QR code</strong></td><td>শুধু <span class="mono">"qr_&lt;productId&gt;"</span> স্ট্রিং; কোনো ছবি তৈরি বা স্ক্যান নেই।</td><td>না</td></tr>
+  <tr><td><strong>Blockchain</strong></td><td><strong>একেবারেই নেই।</strong> trace API নিজেই
+      <span class="mono">ledger_type: "database"</span> বলে দেয়।</td>
+      <td>হ্যাঁ, trace পেজে স্পষ্ট — তবে হোমপেজে একটি অবশিষ্ট “On-chain” লেবেল আছে</td></tr>
+  <tr><td><strong>Product trustScore</strong></td><td>ডিফল্ট ৮০, seed-এ হাতে বসানো; কোনো API এটি স্বয়ংক্রিয়ভাবে বদলায় না।</td><td>না</td></tr>
+  <tr><td><strong>“Eco A” badge</strong></td><td>marketplace কার্ডে স্থির লেখা; গণনা করা হয় না।</td><td>না</td></tr>
+</table>
+
+<h2>36.1 উল্টো দিকে — যা সত্যিই ডাটাবেস-নির্ভর <span class="chip impl">REAL</span></h2>
+<div class="twoCol">
+<ul>
+  <li>Registration, login, JWT ও রোল</li>
+  <li>Farmer Card যাচাই (registry-তে সত্যিকারের lookup)</li>
+  <li>Admin approve / reject ও audit</li>
+  <li>Reputation গণনা ও পুনর্গণনা</li>
+  <li>পণ্য তৈরি, সম্পাদনা, archive, restore</li>
+  <li>ছবি আপলোড ও মুছে ফেলা</li>
+  <li>Marketplace তালিকা ও filter</li>
+  <li>Cart ও stock কমানো</li>
+  <li>Order, OrderItem, status timeline</li>
+  <li>ক্রয়-নির্ভর review ও moderation</li>
+  <li>Wishlist</li>
+  <li>Rewards ledger</li>
+  <li>Trace event</li>
+  <li>Account suspend / reinstate</li>
+  <li>Rate limiting ও masking</li>
+  <li>Admin metrics</li>
+</ul>
+</div>

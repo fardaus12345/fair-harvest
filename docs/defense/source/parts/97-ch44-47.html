@@ -1,0 +1,245 @@
+<h1 class="chapter" id="ch44"><span class="num">44</span>“এটা কেন ব্যবহার করলেন?” — দ্রুত উত্তর তালিকা<span class="mk">[[C44]]</span></h1>
+
+<p>ভাইভায় এই প্রশ্নগুলো দ্রুত একটার পর একটা আসে। প্রতিটির উত্তর <strong>এক বাক্যে</strong> মুখস্থ রাখুন।</p>
+
+<table class="data">
+  <tr><th style="width:24%">প্রশ্ন</th><th>এক-বাক্যের উত্তর</th></tr>
+  <tr><td><strong>Next.js কেন?</strong></td><td>Frontend ও backend একই প্রজেক্টে রাখা যায়, একবারে deploy হয়, আর Server Component-এর কারণে পেজ দ্রুত ও SEO-বান্ধব।</td></tr>
+  <tr><td><strong>React কেন?</strong></td><td>Component-ভিত্তিক কাঠামোয় একই UI বারবার লেখা লাগে না — যেমন <span class="mono">ProductImage</span> সাতটি আলাদা পেজে ব্যবহৃত হয়।</td></tr>
+  <tr><td><strong>Prisma কেন?</strong></td><td>একটি schema ফাইল থেকেই ডাটাবেস, migration ও type-safe query — আর parameterized query-র কারণে SQL injection-এর ঝুঁকি কমে।</td></tr>
+  <tr><td><strong>PostgreSQL কেন?</strong></td><td>ডেটা সম্পূর্ণ relational, এবং foreign key, enum, cascade ও transaction — সবই আমার ব্যবসায়িক নিয়ম প্রয়োগে দরকার ছিল।</td></tr>
+  <tr><td><strong>Neon কেন?</strong></td><td>Serverless PostgreSQL, connection pooling দেয়, free tier আছে, আর Vercel-এর সাথে সহজে যুক্ত হয়।</td></tr>
+  <tr><td><strong>JWT কেন?</strong></td><td>Stateless — server-এ session রাখতে হয় না, যা serverless পরিবেশে অপরিহার্য।</td></tr>
+  <tr><td><strong>bcrypt কেন?</strong></td><td>ইচ্ছাকৃতভাবে ধীর ও প্রতিটি পাসওয়ার্ডে আলাদা salt দেয়, তাই brute-force ও rainbow table কাজ করে না।</td></tr>
+  <tr><td><strong>Zod কেন?</strong></td><td>ক্লায়েন্ট থেকে আসা প্রতিটি JSON-এর গঠন ও ধরন এক জায়গায় ঘোষণা করে যাচাই করা যায়; ব্যর্থ হলে 422।</td></tr>
+  <tr><td><strong>Vercel কেন?</strong></td><td>Next.js-এর নির্মাতার প্ল্যাটফর্ম — git push করলেই deploy, preview URL, HTTPS ও Blob storage একসাথে।</td></tr>
+  <tr><td><strong>Vercel Blob কেন?</strong></td><td>Serverless ফাইল সিস্টেম read-only ও ক্ষণস্থায়ী, তাই ছবি ডিস্কে রাখা যায় না।</td></tr>
+  <tr><td><strong>REST কেন?</strong></td><td>সরল, সর্বজনীন, আর Next.js-এর route handler-এর সাথে স্বাভাবিকভাবে মেলে; ক্লায়েন্ট একটিই বলে GraphQL-এর দরকার পড়েনি।</td></tr>
+  <tr><td><strong>Soft delete কেন?</strong></td><td>কারণ <span class="mono">OrderItem → Product</span> সম্পর্ক RESTRICT, আর পুরোনো order, review ও trace ইতিহাস অক্ষত রাখা প্ল্যাটফর্মের মূল প্রতিশ্রুতি।</td></tr>
+  <tr><td><strong>Audit log কেন?</strong></td><td>Admin-এর হাতে অনেক ক্ষমতা; কে কখন কী করল তার প্রমাণ না থাকলে জবাবদিহি থাকে না।</td></tr>
+  <tr><td><strong>Rate limiting কেন?</strong></td><td>পাসওয়ার্ড অনুমান, ভুয়া অ্যাকাউন্ট ও storage ভরে ফেলা ঠেকাতে।</td></tr>
+  <tr><td><strong>Farmer verification কেন?</strong></td><td>নাহলে যে কেউ “কৃষক” সেজে বিক্রি করত, আর প্ল্যাটফর্মের মূল প্রতিশ্রুতিই মিথ্যা হয়ে যেত।</td></tr>
+  <tr><td><strong>Reputation কেন?</strong></td><td>Verification বলে “সে কৃষক”; reputation বলে “সে ভালো কৃষক”।</td></tr>
+  <tr><td><strong>Normalization কেন?</strong></td><td>একই তথ্য একাধিক জায়গায় থাকলে একটি বদলালে অন্যটি পুরোনো থেকে যেত (update anomaly)।</td></tr>
+  <tr><td><strong>Order ও OrderItem আলাদা কেন?</strong></td><td>এক order-এ অনেক পণ্য — one-to-many সম্পর্ক; এক টেবিলে রাখলে ঠিকানা ও মোট দাম প্রতিটি সারিতে পুনরাবৃত্তি হতো।</td></tr>
+  <tr><td><strong>Cart ও CartItem আলাদা কেন?</strong></td><td>একই যুক্তি; সাথে <span class="mono">Cart.userId @unique</span> নিশ্চিত করে প্রতি ব্যবহারকারীর একটিই ঝুড়ি।</td></tr>
+  <tr><td><strong>Environment variable কেন?</strong></td><td>গোপন মান কোডে থাকলে git-এ চলে যেত; আর dev ও production-এ আলাদা মান দেওয়া যেত না।</td></tr>
+  <tr><td><strong>Migration কেন?</strong></td><td>ডাটাবেসের প্রতিটি পরিবর্তন git-এ নথিভুক্ত থাকে, এবং production-এ একই ক্রমে নিরাপদে প্রয়োগ করা যায়।</td></tr>
+  <tr><td><strong>Provider abstraction কেন?</strong></td><td>ভবিষ্যতে সরকারি API বা অন্য storage এলে শুধু একটি ফাইল বদলাতে হবে — route, schema বা frontend নয়।</td></tr>
+  <tr><td><strong>Serializer কেন?</strong></td><td>Prisma model সরাসরি পাঠালে <span class="mono">passwordHash</span>ও চলে যেত; serializer ঠিক করে দেয় কোন ফিল্ড বাইরে যাবে।</td></tr>
+  <tr><td><strong>SDK প্যাকেজ কেন?</strong></td><td>API-র contract স্পষ্ট রাখে, আর ভবিষ্যতের মোবাইল অ্যাপ সরাসরি এটি ব্যবহার করতে পারবে।</td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch45"><span class="num">45</span>প্রজেক্ট ব্যাখ্যা — ৩০ সেকেন্ড থেকে ৫ মিনিট<span class="mk">[[C45]]</span></h1>
+
+<h2>45.1 ৩০ সেকেন্ডের সংস্করণ (মুখস্থ করুন)</h2>
+<div class="box ok">
+  <p style="font-size:10.6pt">“Fair Harvest একটি full-stack digital agricultural marketplace, যেখানে সরকারি
+  Farmer Card দিয়ে <strong>verified</strong> কৃষকরা সরাসরি ক্রেতাদের কাছে পণ্য বিক্রি করতে পারেন।
+  এর তিনটি মূল বৈশিষ্ট্য — কৃষক যাচাই, স্বয়ংক্রিয় reputation score, এবং প্রতিটি পণ্যের
+  মাটি-থেকে-প্লেট traceability। আমি এটি বানিয়েছি Next.js, React, Prisma আর PostgreSQL দিয়ে,
+  Vercel-এ deploy করা।”</p>
+</div>
+
+<h2>45.2 ১ মিনিটের সংস্করণ</h2>
+<div class="box ok">
+  <p>“Fair Harvest একটি full-stack digital agricultural marketplace। সমস্যাটি হলো — বাংলাদেশে কৃষক
+  মধ্যস্বত্বভোগীর কারণে ন্যায্য দাম পান না, আর ক্রেতা জানেন না তার খাবার কোথা থেকে এসেছে।</p>
+  <p>আমার সমাধান তিনটি স্তম্ভের উপর দাঁড়িয়ে। <strong>এক</strong> — কৃষককে Government Farmer Card,
+  NID ও নাম দিয়ে যাচাই করতে হয়; verified না হলে তিনি একটি পণ্যও তালিকাভুক্ত করতে পারেন না।
+  <strong>দুই</strong> — প্রতিটি কৃষকের একটি reputation score আছে, যা verification, review rating ও
+  delivery সম্পূর্ণতার হার থেকে স্বয়ংক্রিয়ভাবে গণনা হয়। <strong>তিন</strong> — প্রতিটি পণ্যের
+  ছয় ধাপের trace timeline আছে, যা কৃষক নিজে লেখেন।</p>
+  <p>এর উপরে সাধারণ e-commerce অংশ — cart, checkout, order tracking আর review। তবে review দিতে হলে
+  সেই পণ্যের একটি DELIVERED order থাকতেই হবে, যা server নিজে যাচাই করে।</p>
+  <p>প্রযুক্তিগতভাবে এটি Next.js 15 App Router-এ একটিই deployment, যা UI ও ৬৪টি REST endpoint দুটোই
+  চালায়; Prisma ORM দিয়ে PostgreSQL, JWT authentication, আর Vercel-এ deploy করা।”</p>
+</div>
+
+<h2>45.3 ২ মিনিটের সংস্করণ</h2>
+<div class="box ok">
+  <p>উপরের ১ মিনিটের অংশটি বলুন, তারপর যোগ করুন —</p>
+  <p>“<strong>ভূমিকা তিনটি:</strong> CONSUMER কেনে ও review দেয়, FARMER পণ্য ও trace ব্যবস্থাপনা করে,
+  ADMIN verification, moderation ও তত্ত্বাবধান করে। প্রতিটি রোলের আলাদা login পেজ আছে, আর প্রতিটি
+  API route server-এ নিজে থেকে রোল ও মালিকানা যাচাই করে — UI-র guard শুধু সুবিধার জন্য।</p>
+  <p><strong>ডাটাবেসে</strong> ১৫টি মডেল ও ১৩টি enum। একটি গুরুত্বপূর্ণ নকশা সিদ্ধান্ত — পণ্য কখনো
+  ডাটাবেস থেকে মুছি না, শুধু ARCHIVED করি। কারণ <span class="mono">OrderItem</span>-এর foreign key
+  RESTRICT, আর পুরোনো order, review ও trace ইতিহাস নষ্ট হওয়া চলবে না।</p>
+  <p><strong>Checkout</strong> একটিমাত্র ডাটাবেস transaction-এ পাঁচটি কাজ করে — order ও item তৈরি,
+  stock কমানো, payment রেকর্ড, reward point, আর cart খালি করা। তাই হয় সব হবে, নয়তো একটিও না।</p>
+  <p><strong>সৎভাবে বলি</strong> — payment gateway ও সরকারি API এখনো demo। তবে দুটোর জন্যই আমি
+  provider abstraction রেখেছি, তাই আসল সংযোগ এলে শুধু একটি ফাইল বদলালেই চলবে।”</p>
+</div>
+
+<h2>45.4 ৫ মিনিটের কারিগরি সংস্করণ — ধাপে ধাপে</h2>
+<table class="data">
+  <tr><th class="c" style="width:8%">সময়</th><th style="width:22%">বিষয়</th><th>কী বলবেন</th></tr>
+  <tr><td class="c">০:০০–০:৪৫</td><td>সমস্যা ও সমাধান</td><td>উপরের ১ মিনিটের অংশ</td></tr>
+  <tr><td class="c">০:৪৫–১:৩০</td><td>আর্কিটেকচার</td>
+      <td>“একটি monolithic Next.js অ্যাপ — <span class="mono">app/</span>-এ UI, <span class="mono">app/api/v1/**</span>-এ
+      ৬৪টি REST handler। স্তরগুলো: route handler → auth layer → business logic → Prisma → PostgreSQL।
+      ছবি Vercel Blob-এ, ডাটাবেসে শুধু URL।”</td></tr>
+  <tr><td class="c">১:৩০–২:১৫</td><td>নিরাপত্তা</td>
+      <td>“bcrypt cost 10 দিয়ে পাসওয়ার্ড, HS256 JWT ২ ঘণ্টার মেয়াদে। তিনটি helper —
+      <span class="mono">requireUser</span>, <span class="mono">requireRole</span>,
+      <span class="mono">requireOwnerOrRole</span> — প্রতিটি route-এ IDOR ঠেকায়। Zod দিয়ে সব input
+      validation, পাঁচটি endpoint-এ rate limiting, NID ও card নম্বর সবসময় masked।”</td></tr>
+  <tr><td class="c">২:১৫–৩:১৫</td><td>মূল তিনটি ফিচার</td>
+      <td>Verification-এর দুটি পথ (instant ও manual), reputation-এর সূত্র ও Rahim-এর ৯৭ স্কোরের হিসাব,
+      এবং trace-এর ছয় ধাপ — যেখানে অসম্পূর্ণ ধাপে কোনো বানানো তারিখ বসানো হয় না।</td></tr>
+  <tr><td class="c">৩:১৫–৪:০০</td><td>ডাটাবেস</td>
+      <td>“১৫টি মডেল। Cascade বনাম Restrict-এর পার্থক্য, <span class="mono">nameSnapshot</span>-এর মতো
+      ইচ্ছাকৃত denormalization, Review-এর দুটি unique constraint, আর AuditLog-এ ইচ্ছাকৃতভাবে FK না রাখা।”</td></tr>
+  <tr><td class="c">৪:০০–৪:৪৫</td><td>Deployment ও পরীক্ষা</td>
+      <td>“GitHub → Vercel; build কমান্ডেই <span class="mono">prisma migrate deploy</span>। Neon-এ pooled ও
+      direct দুটি URL। ৩১টি unit test পাস, lint-এ ০ error। deploy করতে গিয়ে তিনটি প্রকৃত সমস্যা হয়েছিল,
+      তিনটিরই মূল কারণ খুঁজে সমাধান করেছি।”</td></tr>
+  <tr><td class="c">৪:৪৫–৫:০০</td><td>সীমাবদ্ধতা</td>
+      <td>“সৎভাবে — payment ও সরকারি API demo, rate limit in-memory, integration test নেই।
+      প্রতিটির সমাধানের পথ আমি নথিভুক্ত করে রেখেছি।”</td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch46"><span class="num">46</span>সম্পূর্ণ সিস্টেম কীভাবে কাজ করে — একটি গল্প<span class="mk">[[C46]]</span></h1>
+
+<p>এই অধ্যায়টি মুখস্থ করুন। বোর্ড যদি বলেন “পুরো সিস্টেমটা একবার বলুন” — এটিই বলবেন।</p>
+
+<pre>রহিম (কৃষক) → /auth/farmer-এ register
+       ↓  User + খালি FarmerProfile তৈরি হয়, status = PENDING
+       ↓  dashboard বলে: "Verification required" — Add product ফর্ম নেই
+রহিম → /farmer/verify-এ Card BD-FARM-0001 + NID + নাম দেন
+       ↓  GovFarmerCardRecord-এ lookup → তিনটিই মেলে → confidence 0.98
+       ↓  verificationStatus = VERIFIED,  reputation পুনর্গণনা → 78 ("Reliable Farmer")
+       ↓  dashboard unlock
+রহিম → ছবি upload (3 MB সীমা, JPG/PNG/WebP) → products/&lt;uuid&gt;.jpg → URL
+     → "Organic Spinach", 120 BDT/kg, 40 kg → POST /products (verification gate পাস)
+     → Product তৈরি, status = ACTIVE
+রহিম → trace event যোগ করেন: PLANTED → HARVESTED → LAB_TESTED → PACKAGED → SHIPPED → LISTED
+       ↓
+করিম (ক্রেতা) → /marketplace — শুধু ACTIVE পণ্য, trustScore অনুসারে সাজানো
+       → product detail → "Verified farmer" badge, freshness window
+       → /trace/&lt;id&gt; — ছয়টি ধাপ, GPS, এবং স্পষ্ট ঘোষণা: ledger_type = "database"
+       → "Add" → login না থাকলে /auth/customer-এ পাঠায়
+       → cart-এ যোগ (পণ্য ACTIVE কি না যাচাই হয়)
+       → /checkout — ঠিকানা + Demo card
+       ↓  একটি $transaction-এ:
+          Order + OrderItem (nameSnapshot, দাম কপি) + OrderStatusEvent(PENDING)
+          Product.quantityKg 40 → 38
+          Payment (DEMO_CARD → PAID, ref = DEMO-xxxxxxxx)
+          RewardsLedger +20
+          CartItem মুছে ফেলা
+       ↓  201 → /orders/&lt;id&gt;-এ redirect
+রহিম/admin → status বদলান: CONFIRMED → SHIPPED → DELIVERED
+       ↓  প্রতিবার একটি নতুন OrderStatusEvent যোগ হয় (পুরোনো কিছু মোছা হয় না)
+       ↓  DELIVERED হওয়ায় রহিমের reputation পুনর্গণনা হয়
+করিম → পণ্য পেজে এখন review ফর্ম দেখতে পান
+       ↓  server যাচাই করে: DELIVERED OrderItem আছে? আগে review দিয়েছেন?
+       ↓  ৫ তারা → Review তৈরি → reputation পুনর্গণনা → 97 ("Trusted Seller")
+admin → /admin/dashboard — metrics
+      → /admin/verification — অন্য pending কৃষকদের approve/reject (audit log-এ লেখা হয়)
+      → /admin/reviews — আপত্তিকর review hide (reputation আবার বদলায়, audit লেখা হয়)
+      → /admin/audit-log — সব সিদ্ধান্তের প্রমাণ
+রহিম → পণ্যের মৌসুম শেষ → Archive (confirmation দেখায়)
+       ↓  status = ARCHIVED — marketplace থেকে অদৃশ্য
+       ↓  কিন্তু করিমের order, review ও trace সব অক্ষত (soft delete)
+       ↓  audit log-এ product_archived লেখা হয়</pre>
+
+<div class="box ok">
+  <span class="boxTitle">এই গল্পটি কেন শক্তিশালী?</span>
+  <p>এতে প্রজেক্টের প্রতিটি মডিউল একবার করে আসে, ক্রমানুসারে — verification, product, image,
+  trace, marketplace, cart, transaction, order status, review, reputation, admin, audit, soft delete।
+  একটিও অতিরিক্ত দাবি নেই, আর কোথাও কিছু বাদ পড়েনি।</p>
+</div>
+
+
+<h1 class="chapter" id="ch47"><span class="num">47</span>Quick Revision Sheet<span class="mk">[[C47]]</span></h1>
+
+<p>ভাইভার ১৫–২০ মিনিট আগে এই অধ্যায়টুকু পড়লেই যথেষ্ট।</p>
+
+<h2>47.1 প্রজেক্ট</h2>
+<table class="data tight">
+  <tr><td style="width:24%"><strong>নাম</strong></td><td>Fair Harvest</td></tr>
+  <tr><td><strong>এক লাইনে</strong></td><td>Verified কৃষকদের agricultural marketplace, যেখানে soil-to-plate traceability ও স্বয়ংক্রিয় farmer reputation আছে</td></tr>
+  <tr><td><strong>ব্যবহারকারী</strong></td><td>CONSUMER · FARMER · ADMIN</td></tr>
+  <tr><td><strong>তিনটি স্তম্ভ</strong></td><td>Farmer Card verification · Reputation score · TraceEvent timeline</td></tr>
+</table>
+
+<h2>47.2 স্ট্যাক</h2>
+<table class="data tight">
+  <tr><td style="width:24%"><strong>Frontend</strong></td><td>Next.js 15 App Router · React 19 · হাতে লেখা CSS · lucide-react</td></tr>
+  <tr><td><strong>Backend</strong></td><td>Next.js Route Handler (<span class="mono">app/api/v1/**</span>) · Zod · bcryptjs · jsonwebtoken</td></tr>
+  <tr><td><strong>Database</strong></td><td>PostgreSQL (Neon) · Prisma 6.19.3 · ১৫ মডেল · ১৩ enum · ১টি migration</td></tr>
+  <tr><td><strong>Storage</strong></td><td>Vercel Blob (production) · local disk (dev)</td></tr>
+  <tr><td><strong>Deploy</strong></td><td>GitHub → Vercel · build-এ <span class="mono">prisma migrate deploy</span></td></tr>
+</table>
+
+<h2>47.3 সংখ্যায়</h2>
+<div class="twoCol">
+<table class="data tight">
+  <tr><td>API endpoint (method)</td><td class="c"><strong>৬৪</strong></td></tr>
+  <tr><td>Route ফাইল</td><td class="c">৫৪</td></tr>
+  <tr><td>ডাটাবেস মডেল</td><td class="c">১৫</td></tr>
+  <tr><td>Enum</td><td class="c">১৩</td></tr>
+  <tr><td>Foreign key</td><td class="c">১৮</td></tr>
+  <tr><td>Index</td><td class="c">১২ + ৯ unique</td></tr>
+  <tr><td>Unit test</td><td class="c">২৬ + ৫ = <strong>৩১</strong></td></tr>
+  <tr><td>Lint error</td><td class="c">০</td></tr>
+  <tr><td>i18n স্ট্রিং</td><td class="c">১৭৭</td></tr>
+  <tr><td>Rate-limited endpoint</td><td class="c">৫</td></tr>
+</table>
+</div>
+
+<h2>47.4 মুখস্থ রাখার সূত্র</h2>
+<div class="box ok">
+  <p style="text-align:center;font-size:11.5pt;margin:4px 0">
+  <strong>Reputation = clamp( 0.35 × verification + 0.40 × review + 0.25 × delivery )</strong></p>
+  <p style="text-align:center">verification: VERIFIED 90 · PENDING 60 · REJECTED 30<br>
+  review: (avg ÷ 5) × 100, না থাকলে <strong>70</strong> · delivery: (delivered ÷ মোট) × 100, না থাকলে <strong>75</strong><br>
+  Badge: ≥90 Trusted Seller · ≥75 Reliable Farmer · ≥55 Growing Farmer · &lt;55 New Farmer</p>
+</div>
+
+<h2>47.5 গুরুত্বপূর্ণ enum</h2>
+<table class="data tight">
+  <tr><td style="width:26%"><strong>Role</strong></td><td>CONSUMER · FARMER · ADMIN</td></tr>
+  <tr><td><strong>VerificationStatus</strong></td><td>PENDING · VERIFIED · REJECTED</td></tr>
+  <tr><td><strong>ProductStatus</strong></td><td>ACTIVE · OUT_OF_STOCK · ARCHIVED</td></tr>
+  <tr><td><strong>OrderStatus</strong></td><td>PENDING · CONFIRMED · SHIPPED · DELIVERED · CANCELLED</td></tr>
+  <tr><td><strong>PaymentMethod</strong></td><td>COD · DEMO_CARD</td></tr>
+  <tr><td><strong>TraceStage</strong></td><td>PLANTED · HARVESTED · LAB_TESTED · PACKAGED · SHIPPED · LISTED</td></tr>
+</table>
+
+<h2>47.6 সবচেয়ে গুরুত্বপূর্ণ কোড-লাইন</h2>
+<pre>// ১. Verification gate — প্ল্যাটফর্মের মূল নিয়ম
+if (farmer.verificationStatus !== "VERIFIED") throw new ApiError("Only verified farmers can list products", 403);
+
+// ২. Soft delete
+await prisma.product.update({ where: { id }, data: { status: "ARCHIVED" } });
+
+// ৩. IDOR প্রতিরোধ
+requireOwnerOrRole(request, userId, ["ADMIN"]);
+
+// ৪. ক্রয়-নির্ভর review
+prisma.orderItem.findFirst({ where: { productId, order: { userId: customerId, status: "DELIVERED" } } });
+
+// ৫. Atomic checkout
+await prisma.$transaction(async (tx) =&gt; { /* order + stock + payment + reward + cart clear */ });
+
+// ৬. Reputation
+clamp(verificationScore * 0.35 + reviewScore * 0.40 + deliveryScore * 0.25);</pre>
+
+<h2>47.7 ডেমো অ্যাকাউন্ট</h2>
+<table class="data tight">
+  <tr><td style="width:22%">Admin</td><td><span class="mono">admin@fairharvest.com</span> / <span class="mono">Admin123!</span></td></tr>
+  <tr><td>Farmer (verified)</td><td><span class="mono">rahim@fairharvest.com</span> / <span class="mono">Farmer123!</span></td></tr>
+  <tr><td>Farmer (pending)</td><td><span class="mono">karim@fairharvest.com</span> / <span class="mono">Farmer123!</span></td></tr>
+  <tr><td>Consumer</td><td><span class="mono">demo@fairharvest.com</span> / <span class="mono">FairHarvest123</span></td></tr>
+  <tr><td>যাচাইয়ের কার্ড</td><td><span class="mono">BD-FARM-0001</span> · NID <span class="mono">1990123456789</span> · নাম <span class="mono">Rahim Uddin</span></td></tr>
+</table>
+
+<h2>47.8 তিনটি কথা যা অবশ্যই সৎভাবে বলবেন</h2>
+<ol>
+  <li>Payment সম্পূর্ণ demo — কোনো gateway নেই।</li>
+  <li>Farmer Card যাচাই একটি demo registry, প্রকৃত সরকারি API নয় — তবে abstraction প্রস্তুত।</li>
+  <li>Rate limiting in-memory, তাই একাধিক instance-এ নির্ভরযোগ্য নয় — Redis লাগবে।</li>
+</ol>

@@ -1,0 +1,376 @@
+<!--PART:ভাগ ছ — ডাটাবেস, Prisma ও API-->
+<h1 class="chapter" id="ch29"><span class="num">29</span>Database Design<span class="mk">[[C29]]</span></h1>
+
+<h2>29.1 এক নজরে</h2>
+<table class="data">
+  <tr><td style="width:28%"><strong>ডাটাবেস</strong></td><td>PostgreSQL (production-এ Neon)</td>
+      <td style="width:26%"><strong>মডেল সংখ্যা</strong></td><td>১৫</td></tr>
+  <tr><td><strong>enum সংখ্যা</strong></td><td>১৩</td><td><strong>Foreign key</strong></td><td>১৮</td></tr>
+  <tr><td><strong>Unique index</strong></td><td>৯</td><td><strong>সাধারণ index</strong></td><td>১২</td></tr>
+  <tr><td><strong>Primary key</strong></td><td>সবগুলোই <span class="mono">String @id @default(cuid())</span></td>
+      <td><strong>Migration</strong></td><td>১টি (<span class="mono">20260922135451_init</span>)</td></tr>
+</table>
+
+<div class="box info">
+  <span class="boxTitle">কেন <span class="mono">cuid()</span>, auto-increment integer নয়?</span>
+  <p>(১) URL-এ <span class="mono">/marketplace/7</span> দেখলে যে কেউ বুঝে যায় মোট কতগুলো পণ্য আছে এবং
+  ১, ২, ৩ … করে সব দেখে ফেলতে পারে (enumeration)। (২) cuid একাধিক server থেকে একসাথে তৈরি করলেও
+  সংঘর্ষ হয় না। (৩) id ক্লায়েন্টেও তৈরি করা যায়, ডাটাবেসের অপেক্ষা না করে।</p>
+</div>
+
+<h2>29.2 সম্পূর্ণ ERD</h2>
+<figure class="tall">
+  <img src="diagrams/d8-erd.svg" alt="Entity Relationship Diagram">
+  <figcaption class="caption">চিত্র 36: Fair Harvest-এর সম্পূর্ণ Entity Relationship Diagram — ১৫টি মডেল ও তাদের সম্পর্ক।</figcaption>
+</figure>
+
+<h2>29.3 প্রতিটি মডেল — কেন দরকার</h2>
+<table class="data tight">
+  <tr><th style="width:15%">মডেল</th><th style="width:30%">উদ্দেশ্য</th><th style="width:26%">গুরুত্বপূর্ণ ফিল্ড</th><th>সম্পর্ক</th></tr>
+  <tr><td><strong>User</strong></td><td>সব ধরনের অ্যাকাউন্টের ভিত্তি — তিন রোলই এখানে</td>
+      <td><span class="mono">email @unique</span>, <span class="mono">passwordHash</span>, <span class="mono">role</span>, <span class="mono">status</span></td>
+      <td>1:1 FarmerProfile · 1:1 Cart · 1:N Order, Review, WishlistItem, RewardsLedger</td></tr>
+  <tr><td><strong>FarmerProfile</strong></td><td>কৃষক-নির্দিষ্ট তথ্য User থেকে আলাদা রাখা</td>
+      <td><span class="mono">userId @unique</span>, <span class="mono">verificationStatus</span>, <span class="mono">reputationScore</span>, <span class="mono">badge</span></td>
+      <td>1:1 User (<span class="mono">Cascade</span>) · 1:N Product · verifiedByAdmin → User</td></tr>
+  <tr><td><strong>GovFarmerCardRecord</strong></td><td>সরকারি রেজিস্ট্রির অনুকরণ (demo)</td>
+      <td><span class="mono">cardNumber @unique</span>, <span class="mono">nidNumber</span>, <span class="mono">status</span></td>
+      <td><strong>কোনো relation নেই</strong> — ইচ্ছাকৃত</td></tr>
+  <tr><td><strong>Product</strong></td><td>বিক্রয়যোগ্য পণ্য</td>
+      <td><span class="mono">priceBdt</span>, <span class="mono">quantityKg</span>, <span class="mono">status</span>, <span class="mono">imageUrl</span></td>
+      <td>N:1 FarmerProfile · 1:N CartItem, OrderItem, TraceEvent, Review, WishlistItem</td></tr>
+  <tr><td><strong>Cart</strong></td><td>প্রতি ব্যবহারকারীর একটিমাত্র ঝুড়ি</td><td><span class="mono">userId @unique</span></td><td>1:1 User · 1:N CartItem</td></tr>
+  <tr><td><strong>CartItem</strong></td><td>ঝুড়ির একটি সারি</td>
+      <td><span class="mono">quantityKg</span>, <span class="mono">unitPriceBdt</span>, <span class="mono">source</span></td>
+      <td><span class="mono">@@unique([cartId, productId, source])</span></td></tr>
+  <tr><td><strong>Order</strong></td><td>একটি সম্পূর্ণ ক্রয়</td>
+      <td><span class="mono">status</span>, <span class="mono">totalBdt</span>, ঠিকানা, <span class="mono">paymentStatus</span></td>
+      <td>N:1 User · 1:N OrderItem, OrderStatusEvent · 1:1 Payment</td></tr>
+  <tr><td><strong>OrderItem</strong></td><td>order-এর একটি লাইন — নাম ও দাম snapshot সহ</td>
+      <td><span class="mono">nameSnapshot</span>, <span class="mono">unitPriceBdt</span>, <span class="mono">lineTotalBdt</span>, <span class="mono">farmerId</span></td>
+      <td>N:1 Order (Cascade) · N:1 Product (<strong>RESTRICT</strong>) · 1:1 Review</td></tr>
+  <tr><td><strong>OrderStatusEvent</strong></td><td>status পরিবর্তনের অপরিবর্তনীয় ইতিহাস</td>
+      <td><span class="mono">status</span>, <span class="mono">note</span>, <span class="mono">createdAt</span></td><td>N:1 Order (Cascade)</td></tr>
+  <tr><td><strong>Payment</strong></td><td>লেনদেনের রেকর্ড (demo)</td>
+      <td><span class="mono">orderId @unique</span>, <span class="mono">demoTransactionRef</span>, <span class="mono">paidAt</span></td><td>1:1 Order</td></tr>
+  <tr><td><strong>TraceEvent</strong></td><td>মাটি-থেকে-প্লেট ইতিহাস</td>
+      <td><span class="mono">stage</span>, <span class="mono">timestamp</span>, <span class="mono">gpsLat/Lng</span></td><td>N:1 Product (Cascade)</td></tr>
+  <tr><td><strong>Review</strong></td><td>ক্রয়-নির্ভর মূল্যায়ন</td>
+      <td><span class="mono">rating</span>, <span class="mono">orderItemId @unique</span>, <span class="mono">status</span></td>
+      <td>N:1 User, Product · 1:1 OrderItem (<strong>Restrict</strong>) · <span class="mono">@@unique([customerId, productId])</span></td></tr>
+  <tr><td><strong>WishlistItem</strong></td><td>পছন্দের তালিকা</td><td><span class="mono">@@unique([userId, productId])</span></td><td>N:1 User, Product (Cascade)</td></tr>
+  <tr><td><strong>RewardsLedger</strong></td><td>পয়েন্টের খতিয়ান</td><td><span class="mono">points</span>, <span class="mono">reason</span></td><td>N:1 User (Cascade)</td></tr>
+  <tr><td><strong>AuditLog</strong></td><td>admin কাজের প্রমাণ</td>
+      <td><span class="mono">action</span>, <span class="mono">targetType/Id</span>, <span class="mono">metadata</span></td>
+      <td><strong>কোনো FK নেই</strong> — ইচ্ছাকৃত</td></tr>
+</table>
+
+<h2>29.4 তেরোটি enum</h2>
+<table class="data tight">
+  <tr><th style="width:22%">Enum</th><th>মান</th></tr>
+  <tr><td><span class="mono">Role</span></td><td>CONSUMER · FARMER · ADMIN</td></tr>
+  <tr><td><span class="mono">UserStatus</span></td><td>ACTIVE · SUSPENDED</td></tr>
+  <tr><td><span class="mono">VerificationStatus</span></td><td>PENDING · VERIFIED · REJECTED</td></tr>
+  <tr><td><span class="mono">VerificationMethod</span></td><td>DEMO_REGISTRY · OFFICIAL_API · MANUAL</td></tr>
+  <tr><td><span class="mono">GovCardStatus</span></td><td>ACTIVE · REVOKED</td></tr>
+  <tr><td><span class="mono">ProductCategory</span></td><td>vegetable · fruit · grain · herb <em>(ছোট হরফে — enum-গুলোর মধ্যে একমাত্র ব্যতিক্রম)</em></td></tr>
+  <tr><td><span class="mono">ProductStatus</span></td><td>ACTIVE · OUT_OF_STOCK · ARCHIVED</td></tr>
+  <tr><td><span class="mono">CartItemSource</span></td><td>DIRECT · MEAL_PLAN · PRESCRIPTION</td></tr>
+  <tr><td><span class="mono">OrderStatus</span></td><td>PENDING · CONFIRMED · SHIPPED · DELIVERED · CANCELLED</td></tr>
+  <tr><td><span class="mono">PaymentMethod</span></td><td>COD · DEMO_CARD</td></tr>
+  <tr><td><span class="mono">PaymentStatus</span></td><td>PENDING · PAID · FAILED <em>(FAILED কোথাও বসানো হয় না)</em></td></tr>
+  <tr><td><span class="mono">TraceStage</span></td><td>PLANTED · HARVESTED · LAB_TESTED · PACKAGED · SHIPPED · LISTED</td></tr>
+  <tr><td><span class="mono">ReviewStatus</span></td><td>PUBLISHED · HIDDEN</td></tr>
+</table>
+
+<h2>29.5 Cascade বনাম Restrict — নকশার হৃদয়</h2>
+<table class="data">
+  <tr><th style="width:30%">সম্পর্ক</th><th style="width:16%">আচরণ</th><th>কেন</th></tr>
+  <tr><td>User → FarmerProfile</td><td><span class="mono">Cascade</span></td><td>ব্যবহারকারী না থাকলে তার profile অর্থহীন</td></tr>
+  <tr><td>User → Cart, WishlistItem, RewardsLedger</td><td><span class="mono">Cascade</span></td><td>ব্যক্তিগত, অন্য কারও কাজে লাগে না</td></tr>
+  <tr><td>FarmerProfile → Product</td><td><span class="mono">Cascade</span></td><td>কৃষক না থাকলে তার listing থাকা উচিত নয়</td></tr>
+  <tr><td>Order → OrderItem, OrderStatusEvent, Payment</td><td><span class="mono">Cascade</span></td><td>order-এর অংশ, আলাদা অর্থ নেই</td></tr>
+  <tr><td><strong>Product → OrderItem</strong></td><td><strong><span class="mono">RESTRICT</span></strong>
+      <br>(ডিফল্ট)</td>
+      <td><strong>সবচেয়ে গুরুত্বপূর্ণ:</strong> order থাকলে পণ্য মোছা যাবে না — এটিই soft delete-কে
+      বাধ্যতামূলক করে তোলে</td></tr>
+  <tr><td><strong>OrderItem → Review</strong></td><td><strong><span class="mono">Restrict</span></strong></td>
+      <td>যে ক্রয়ের ভিত্তিতে review হয়েছে, সেটি মুছে গেলে review-এর প্রমাণ হারাত</td></tr>
+  <tr><td>Order → User</td><td>ডিফল্ট (Restrict)</td><td>order আছে এমন ব্যবহারকারী মোছা যাবে না — হিসাব রক্ষা</td></tr>
+</table>
+
+<h2>29.6 Index — কেন ঠিক এইগুলো?</h2>
+<table class="data">
+  <tr><th style="width:36%">Index</th><th>যে query-কে দ্রুত করে</th></tr>
+  <tr><td><span class="mono">User @@index([role])</span></td><td>admin-এর “সব কৃষক” / “সব ক্রেতা” তালিকা</td></tr>
+  <tr><td><span class="mono">FarmerProfile @@index([verificationStatus])</span></td><td>verification queue ও pending গণনা</td></tr>
+  <tr><td><span class="mono">Product @@index([category])</span></td><td>marketplace-এর category filter</td></tr>
+  <tr><td><span class="mono">Product @@index([status])</span></td><td>public marketplace-এর <span class="mono">status = ACTIVE</span> filter</td></tr>
+  <tr><td><span class="mono">Order @@index([userId])</span></td><td>“আমার order” তালিকা</td></tr>
+  <tr><td><span class="mono">OrderItem @@index([farmerId])</span></td><td>কৃষকের order ও earnings</td></tr>
+  <tr><td><span class="mono">Review @@index([productId])</span>, <span class="mono">([farmerId])</span></td><td>পণ্যের ও কৃষকের review</td></tr>
+  <tr><td><span class="mono">WishlistItem @@index([userId])</span></td><td>“আমার wishlist”</td></tr>
+  <tr><td><span class="mono">AuditLog @@index([targetType, targetId])</span>, <span class="mono">([createdAt])</span></td>
+      <td>নির্দিষ্ট বস্তুর ইতিহাস; এবং সাম্প্রতিক ২০০টি</td></tr>
+</table>
+
+<h2>29.7 Normalization — কোথায় মানা হয়েছে, কোথায় ইচ্ছাকৃতভাবে ভাঙা</h2>
+<table class="data">
+  <tr><th style="width:30%">সিদ্ধান্ত</th><th>ব্যাখ্যা</th></tr>
+  <tr><td><strong>স্বাভাবিকীকরণ মানা হয়েছে</strong></td>
+      <td>Cart/CartItem, Order/OrderItem, User/FarmerProfile — প্রতিটি ধারণা আলাদা টেবিলে, পুনরাবৃত্তি নেই</td></tr>
+  <tr><td><strong>ইচ্ছাকৃত denormalization ১</strong><br><span class="mono">OrderItem.nameSnapshot</span> ও দাম</td>
+      <td>ঐতিহাসিক নির্ভুলতার জন্য — কৃষক পরে নাম/দাম বদলালেও পুরোনো রসিদ বদলাবে না</td></tr>
+  <tr><td><strong>ইচ্ছাকৃত denormalization ২</strong><br><span class="mono">OrderItem.farmerId</span></td>
+      <td>কৃষকের order query-তে Product হয়ে join করা লাগে না — সরাসরি index ব্যবহার হয়</td></tr>
+  <tr><td><strong>ইচ্ছাকৃত denormalization ৩</strong><br><span class="mono">Review.farmerId</span></td>
+      <td>কৃষকের সব review একবারে আনা যায়, প্রতিটি product-এ join ছাড়াই</td></tr>
+  <tr><td><strong>গণনা করা মান সংরক্ষণ</strong><br><span class="mono">FarmerProfile.reputationScore</span></td>
+      <td>প্রতিবার গণনা করলে marketplace-এর প্রতিটি কার্ডে বহু query লাগত; তাই ঘটনার পরে একবার গণনা করে লিখে রাখা হয়</td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch30"><span class="num">30</span>Prisma ORM, Migration ও Seed<span class="mk">[[C30]]</span></h1>
+
+<h2>30.1 ORM কী? কেন Prisma?</h2>
+<p><strong>ORM (Object-Relational Mapping)</strong> — যে স্তরটি ডাটাবেসের সারি (row) আর কোডের
+object-এর মধ্যে অনুবাদক হিসেবে কাজ করে। হাতে SQL লেখার বদলে আমরা লিখি
+<span class="mono">prisma.product.findMany({ where: { status: "ACTIVE" } })</span>, আর Prisma সেটিকে
+নিরাপদ SQL-এ রূপান্তর করে।</p>
+<table class="data">
+  <tr><th style="width:26%">সুবিধা</th><th>ব্যাখ্যা</th></tr>
+  <tr><td>Single source of truth</td><td>একটি <span class="mono">schema.prisma</span> থেকেই ডাটাবেস, migration ও TypeScript টাইপ — সব তৈরি হয়</td></tr>
+  <tr><td>SQL injection প্রতিরোধ</td><td>Prisma সবসময় parameterized query তৈরি করে; ব্যবহারকারীর লেখা কখনো SQL-এর অংশ হয় না</td></tr>
+  <tr><td>Auto-complete ও টাইপ</td><td>ভুল ফিল্ডের নাম লিখলে সম্পাদকেই ধরা পড়ে</td></tr>
+  <tr><td>Migration ইতিহাস</td><td>প্রতিটি schema পরিবর্তন একটি SQL ফাইল হিসেবে git-এ সংরক্ষিত</td></tr>
+  <tr><td>Relation query</td><td><span class="mono">include: { farmer: { include: { user: true } } }</span> — জটিল join এক লাইনে</td></tr>
+</table>
+
+<h2>30.2 দুটি connection string — কেন?</h2>
+<pre>datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // pooled — অ্যাপ্লিকেশন চলার সময়
+  directUrl = env("DIRECT_URL")     // direct  — শুধু migration-এর সময়
+}</pre>
+<table class="data">
+  <tr><th style="width:22%">Variable</th><th style="width:26%">সংযোগের ধরন</th><th>কে ব্যবহার করে ও কেন</th></tr>
+  <tr><td><span class="mono">DATABASE_URL</span></td><td>pooled (Neon-এ <span class="mono">-pooler</span> host)</td>
+      <td>Serverless function ক্ষণস্থায়ী ও অসংখ্য। প্রত্যেকে নিজের সংযোগ খুললে PostgreSQL-এর সীমা
+      ফুরিয়ে যেত। Pooler কয়েকটি সংযোগ ভাগ করে দেয়।</td></tr>
+  <tr><td><span class="mono">DIRECT_URL</span></td><td>direct (pooler ছাড়া)</td>
+      <td><span class="mono">prisma migrate</span> DDL চালায় (CREATE TABLE ইত্যাদি), যার জন্য একটি
+      স্থায়ী session দরকার — pooler সেটি দিতে পারে না।</td></tr>
+</table>
+
+<h2>30.3 Prisma Client — একটি সূক্ষ্ম কিন্তু জরুরি প্যাটার্ন</h2>
+<pre>// lib/server/db.js
+const globalForPrisma = globalThis;
+export const prisma = globalForPrisma.__fairHarvestPrisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.__fairHarvestPrisma = prisma;</pre>
+<p>Next.js development-এ hot-reload হলে module আবার লোড হয়। প্রতিবার
+<span class="mono">new PrismaClient()</span> হলে কয়েক মিনিটেই ডাটাবেসের সংযোগ-সীমা ফুরিয়ে যেত।
+তাই client-টি <span class="mono">globalThis</span>-এ রেখে পুনর্ব্যবহার করা হয়।</p>
+
+<h2>30.4 Migration</h2>
+<p>প্রজেক্টে একটিমাত্র migration আছে: <span class="mono">prisma/migrations/20260922135451_init/migration.sql</span>।
+এটি সম্পূর্ণ PostgreSQL SQL — ১৩টি <span class="mono">CREATE TYPE</span>, ১৫টি
+<span class="mono">CREATE TABLE</span>, ৯টি unique index, ১২টি index এবং ১৮টি foreign key।
+<span class="mono">migration_lock.toml</span>-এ লেখা <span class="mono">provider = "postgresql"</span>।</p>
+
+<table class="data">
+  <tr><th style="width:28%">কমান্ড</th><th style="width:18%">কোথায় চলে</th><th>কী করে</th></tr>
+  <tr><td><span class="mono">prisma migrate dev</span></td><td>ডেভেলপমেন্ট</td><td>schema-র পরিবর্তন দেখে নতুন migration ফাইল তৈরি করে ও প্রয়োগ করে</td></tr>
+  <tr><td><span class="mono">prisma migrate deploy</span></td><td><strong>production</strong></td>
+      <td>শুধু যে migration এখনো প্রয়োগ হয়নি সেগুলো চালায়; নতুন ফাইল তৈরি করে না, কিছু মোছেও না</td></tr>
+  <tr><td><span class="mono">prisma generate</span></td><td>উভয়</td><td>schema থেকে Prisma Client কোড তৈরি করে</td></tr>
+  <tr><td><span class="mono">prisma db seed</span></td><td>ডেভেলপমেন্ট/ডেমো</td><td><span class="mono">prisma/seed.mjs</span> চালায়</td></tr>
+</table>
+<p>Vercel-এর build কমান্ডেই migration যুক্ত করা আছে, তাই deploy করলেই ডাটাবেস হালনাগাদ হয়ে যায়:</p>
+<pre>"build": "prisma generate &amp;&amp; prisma migrate deploy &amp;&amp; next build"</pre>
+
+<h2>30.5 Seed — পুনরায় চালানো নিরাপদ (idempotent)</h2>
+<p><span class="mono">prisma/seed.mjs</span> তৈরি করে: ৮টি Gov Farmer Card, ৪ জন ব্যবহারকারী,
+২টি farmer profile, ২টি পণ্য, ৬টি trace event এবং ১টি সম্পূর্ণ DELIVERED order (payment ও
+reward সহ)।</p>
+<p>প্রতিটি রেকর্ড <span class="mono">upsert</span> বা অস্তিত্ব-যাচাই দিয়ে তৈরি হয়, তাই বারবার
+চালালেও ডেটা দ্বিগুণ হয় না। একটি বিশেষ ক্ষেত্র সমাধান করতে হয়েছিল:</p>
+<pre>// TraceEvent-এর কোনো স্বাভাবিক unique key নেই, তাই upsert করা যায় না।
+// দ্বিতীয়বার seed চালালে প্রতিটি ধাপ দুইবার দেখা যেত।
+const existing = await prisma.traceEvent.findFirst({
+  where: { productId: spinach.id, stage: step.stage } });
+if (existing) continue;</pre>
+
+<h2>30.6 ডেমো অ্যাকাউন্ট</h2>
+<table class="data">
+  <tr><th style="width:14%">রোল</th><th style="width:26%">ইমেইল</th><th style="width:18%">পাসওয়ার্ড</th><th>বিশেষত্ব</th></tr>
+  <tr><td>Admin</td><td><span class="mono">admin@fairharvest.com</span></td><td><span class="mono">Admin123!</span></td><td>সম্পূর্ণ admin console</td></tr>
+  <tr><td>Farmer (verified)</td><td><span class="mono">rahim@fairharvest.com</span></td><td><span class="mono">Farmer123!</span></td>
+      <td>BD-FARM-0001 দিয়ে আগেই verified; ২টি পণ্য আছে</td></tr>
+  <tr><td>Farmer (pending)</td><td><span class="mono">karim@fairharvest.com</span></td><td><span class="mono">Farmer123!</span></td>
+      <td>কার্ড রেজিস্ট্রিতে নেই (BD-FARM-9999) — manual review পথ দেখানোর জন্য</td></tr>
+  <tr><td>Consumer</td><td><span class="mono">demo@fairharvest.com</span></td><td><span class="mono">FairHarvest123</span></td>
+      <td>একটি DELIVERED order আছে → review দিতে পারে</td></tr>
+</table>
+<div class="box warn">
+  <span class="boxTitle">ডেমোর সময় এই দুটি অ্যাকাউন্ট পাশাপাশি দেখান</span>
+  <p>Rahim (verified) আর Karim (pending) — একই dashboard দুজনের কাছে সম্পূর্ণ আলাদা দেখায়।
+  এটিই verification gate-এর সবচেয়ে ভালো লাইভ প্রমাণ (চিত্র 28 ও 29 তুলনা করুন)।</p>
+</div>
+
+
+<h1 class="chapter" id="ch31"><span class="num">31</span>API Architecture ও সম্পূর্ণ Endpoint তালিকা<span class="mk">[[C31]]</span></h1>
+
+<h2>31.1 নকশার নীতি</h2>
+<table class="data">
+  <tr><th style="width:26%">নীতি</th><th>বিস্তারিত</th></tr>
+  <tr><td>Versioned base path</td><td>সব endpoint <span class="mono">/api/v1/</span>-এর নিচে; ভবিষ্যতে v2 যোগ করলেও পুরোনো client ভাঙবে না</td></tr>
+  <tr><td>File-system routing</td><td>ফোল্ডারের পথই URL। <span class="mono">app/api/v1/cart/[userId]/items/route.js</span>
+      → <span class="mono">/api/v1/cart/:userId/items</span></td></tr>
+  <tr><td>HTTP method = function</td><td>একই ফাইলে <span class="mono">export async function GET / POST / PATCH / DELETE</span></td></tr>
+  <tr><td>একটিই response খাম</td><td><span class="mono">{ success, data, message }</span> — সব route-এ একই</td></tr>
+  <tr><td>Snake_case বাইরে, camelCase ভিতরে</td><td>API-তে <span class="mono">price_bdt</span>, ডাটাবেসে <span class="mono">priceBdt</span>;
+      অনুবাদ করে <span class="mono">serializers.js</span></td></tr>
+  <tr><td>Serializer স্তর</td><td>Prisma model কখনো সরাসরি পাঠানো হয় না — তাহলে <span class="mono">passwordHash</span>ও চলে যেত</td></tr>
+</table>
+
+<pre>// lib/server/respond.js — সব route-এর সাধারণ মোড়ক
+export function ok(data, { message = "OK", status = 200 } = {}) {
+  return NextResponse.json({ success: true, data, message }, { status });
+}
+export async function handleRoute(fn) {
+  try { return await fn(); }
+  catch (error) {
+    if (error instanceof ApiError) return fail(error.message, { status: error.status });
+    console.error(error);
+    return fail("Internal server error", { status: 500 });   // বিস্তারিত ফাঁস করা হয় না
+  }
+}</pre>
+
+<h2>31.2 সংখ্যায় API</h2>
+<table class="data">
+  <tr><td style="width:36%"><strong>মোট route ফাইল</strong></td><td>৫৪ (<span class="mono">app/api/v1</span>-এ ৫১ + root-এ ৩)</td></tr>
+  <tr><td><strong>মোট HTTP method handler</strong></td><td><strong>৬৪</strong> — GET ৩১ · POST ২৩ · PATCH ৬ · DELETE ৪</td></tr>
+  <tr><td><strong>OpenAPI নথি</strong></td><td><span class="mono">GET /openapi.json</span> (হাতে লেখা সারাংশ)</td></tr>
+</table>
+
+<h2>31.3 সম্পূর্ণ endpoint তালিকা</h2>
+<p class="tableCaption">সারণি ১ — Authentication</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:24%">Endpoint</th><th style="width:14%">Auth</th><th style="width:26%">Request</th><th>ডাটাবেসে প্রভাব</th></tr>
+  <tr><td>POST</td><td><span class="mono">/auth/register</span></td><td>নেই · ৬/মিনিট</td>
+      <td><span class="mono">{name, email, password, role}</span></td><td>User তৈরি (+ farmer হলে FarmerProfile)</td></tr>
+  <tr><td>POST</td><td><span class="mono">/auth/login</span></td><td>নেই · ১০/মিনিট</td>
+      <td><span class="mono">{email, password}</span></td><td>কিছু লেখা হয় না; JWT ফেরত</td></tr>
+  <tr><td>GET</td><td><span class="mono">/auth/me</span></td><td>যেকোনো login</td><td>—</td><td>শুধু পড়া</td></tr>
+</table>
+
+<p class="tableCaption">সারণি ২ — কৃষক ও যাচাই</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:30%">Endpoint</th><th style="width:20%">Auth</th><th>কাজ</th></tr>
+  <tr><td>POST</td><td><span class="mono">/farmers/{farmerId}/verify</span></td><td>মালিক বা ADMIN · ৮/মিনিট</td><td>Farmer Card যাচাই; profile ও reputation আপডেট</td></tr>
+  <tr><td>GET</td><td><span class="mono">/farmers/{farmerId}/verification-status</span></td><td>মালিক বা ADMIN</td><td>বর্তমান status</td></tr>
+  <tr><td>GET</td><td><span class="mono">/farmers/{farmerId}/score</span></td><td><strong>public</strong></td><td>reputation ও breakdown (কিছু লেখে না)</td></tr>
+  <tr><td>GET</td><td><span class="mono">/farmers/{farmerId}/profile</span></td><td><strong>public</strong></td><td>profile + active পণ্য + ২০টি review (masked card)</td></tr>
+  <tr><td>GET</td><td><span class="mono">/farmer/orders</span></td><td>FARMER</td><td>শুধু নিজের order item</td></tr>
+  <tr><td>GET</td><td><span class="mono">/farmer/earnings</span></td><td>FARMER</td><td>বিক্রির সারাংশ (payout নয়)</td></tr>
+</table>
+
+<p class="tableCaption">সারণি ৩ — পণ্য ও আপলোড</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:30%">Endpoint</th><th style="width:22%">Auth</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/products</span></td><td><strong>public</strong></td><td>তালিকা; <span class="mono">farmer_id</span> ছাড়া হলে শুধু ACTIVE</td></tr>
+  <tr><td>POST</td><td><span class="mono">/products</span></td><td><strong>VERIFIED</strong> farmer বা ADMIN</td><td>নতুন পণ্য (201)</td></tr>
+  <tr><td>GET</td><td><span class="mono">/products/{productId}</span></td><td><strong>public</strong></td><td>বিস্তারিত</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/products/{productId}</span></td><td>মালিক বা ADMIN</td><td>আংশিক আপডেট; পুরোনো ছবি মুছে ফেলে</td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/products/{productId}</span></td><td>মালিক বা ADMIN · ২০/মিনিট</td><td><strong>Archive</strong> (soft delete) + audit</td></tr>
+  <tr><td>GET</td><td><span class="mono">/products/{productId}/scores</span></td><td><strong>public</strong></td>
+      <td>eco/health/pesticide — <span class="mono">trustScore</span> থেকে সূত্রে বের করা <span class="chip demo">derived</span></td></tr>
+  <tr><td>POST</td><td><span class="mono">/products/verify</span></td><td>নেই</td>
+      <td>seller-history heuristic; ডাটাবেসে কিছুই লেখে না <span class="chip demo">stateless</span></td></tr>
+  <tr><td>POST</td><td><span class="mono">/uploads/product-image</span></td><td>VERIFIED farmer বা ADMIN · ২০/মিনিট</td><td>multipart ছবি → <span class="mono">{ image_url }</span></td></tr>
+  <tr><td>GET</td><td><span class="mono">/uploads/product-image</span></td><td>নেই</td><td>অনুমোদিত MIME ও আকারের সীমা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/uploads/{...key}</span></td><td><strong>public</strong></td><td>local provider-এর ফাইল পরিবেশন (object হলে 404)</td></tr>
+</table>
+
+<p class="tableCaption">সারণি ৪ — Cart, Order ও Payment</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:32%">Endpoint</th><th style="width:18%">Auth</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/cart/{userId}</span></td><td>মালিক/ADMIN</td><td>cart + subtotal</td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/cart/{userId}</span></td><td>মালিক/ADMIN</td><td>সব item মুছে ফেলা</td></tr>
+  <tr><td>POST</td><td><span class="mono">/cart/{userId}/items</span></td><td>মালিক/ADMIN</td><td>যোগ বা পরিমাণ বৃদ্ধি (শুধু ACTIVE পণ্য)</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/cart/{userId}/items/{itemId}</span></td><td>মালিক/ADMIN</td><td>পরিমাণ বদল</td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/cart/{userId}/items/{itemId}</span></td><td>মালিক/ADMIN</td><td>item মুছে ফেলা</td></tr>
+  <tr><td>POST</td><td><span class="mono">/orders/{userId}/checkout</span></td><td>মালিক/ADMIN</td>
+      <td><strong>Transaction:</strong> Order+Items+Payment+Reward, stock কমানো, cart খালি</td></tr>
+  <tr><td>GET</td><td><span class="mono">/orders/{userId}</span></td><td>মালিক/ADMIN</td><td>order তালিকা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/orders/detail/{orderId}</span></td><td>order-এর মালিক বা ADMIN</td><td>বিস্তারিত + timeline + payment</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/orders/{orderId}/status</span></td><td>ADMIN বা সংশ্লিষ্ট FARMER</td>
+      <td>status বদল + event; DELIVERED/CANCELLED হলে reputation পুনর্গণনা</td></tr>
+</table>
+
+<p class="tableCaption">সারণি ৫ — Review, Wishlist, Trace, Rewards</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:28%">Endpoint</th><th style="width:20%">Auth</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/reviews?product_id= | farmer_id=</span></td><td><strong>public</strong></td><td>শুধু PUBLISHED + গড় ও সংখ্যা</td></tr>
+  <tr><td>POST</td><td><span class="mono">/reviews</span></td><td>CONSUMER + DELIVERED থাকতে হবে</td><td>review তৈরি + reputation পুনর্গণনা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/wishlist</span></td><td>যেকোনো login</td><td>নিজের তালিকা</td></tr>
+  <tr><td>POST</td><td><span class="mono">/wishlist</span></td><td>যেকোনো login</td><td>upsert</td></tr>
+  <tr><td>GET</td><td><span class="mono">/wishlist/{productId}</span></td><td>যেকোনো login</td><td><span class="mono">{ wishlisted }</span></td></tr>
+  <tr><td>DELETE</td><td><span class="mono">/wishlist/{productId}</span></td><td>যেকোনো login</td><td>সরিয়ে ফেলা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/trace/{productId}</span></td><td><strong>public</strong></td><td>ছয় ধাপের timeline</td></tr>
+  <tr><td>POST</td><td><span class="mono">/trace/{productId}</span></td><td>মালিক farmer বা ADMIN</td><td>নতুন TraceEvent</td></tr>
+  <tr><td>GET</td><td><span class="mono">/users/{userId}/rewards</span></td><td>মালিক/ADMIN</td><td>পয়েন্ট, badge, সাম্প্রতিক কার্যক্রম</td></tr>
+  <tr><td>GET</td><td><span class="mono">/farms/nearby</span></td><td>নেই</td>
+      <td>শীর্ষ ১০ verified কৃষক; <span class="mono">distance_km</span> তালিকার ক্রম থেকে বানানো
+      <span class="chip demo">দূরত্ব বাস্তব নয়</span></td></tr>
+</table>
+
+<p class="tableCaption">সারণি ৬ — Admin (সবগুলোতেই <span class="mono">requireRole(["ADMIN"])</span>)</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:40%">Endpoint</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/metrics</span></td><td>৬টি platform সংখ্যা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/farmers</span></td><td>সব কৃষক (masked id সহ)</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/admin/farmers/{farmerId}</span></td><td>account suspend/reinstate + audit</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/farmers/verifications</span></td><td>pending queue (FIFO)</td></tr>
+  <tr><td>POST</td><td><span class="mono">/admin/farmers/{farmerId}/verification/approve</span></td><td>VERIFIED + audit</td></tr>
+  <tr><td>POST</td><td><span class="mono">/admin/farmers/{farmerId}/verification/reject</span></td><td>REJECTED + audit</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/products</span></td><td>সব status; search/category/status/farmer filter</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/customers</span></td><td>সব ক্রেতা + order সংখ্যা</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/admin/customers/{userId}</span></td><td>suspend/reinstate + audit</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/orders</span></td><td>সব order + ক্রেতার তথ্য</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/reviews</span></td><td>সব review (hidden সহ)</td></tr>
+  <tr><td>PATCH</td><td><span class="mono">/admin/reviews/{reviewId}</span></td><td>hide/republish + reputation + audit</td></tr>
+  <tr><td>GET</td><td><span class="mono">/admin/audit-log</span></td><td>সর্বশেষ ২০০টি কাজ</td></tr>
+</table>
+
+<p class="tableCaption">সারণি ৭ — Heuristic / demo endpoint <span class="chip demo">কোনোটিই প্রকৃত AI নয়</span></p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:30%">Endpoint</th><th>বাস্তবে কী করে</th></tr>
+  <tr><td>POST</td><td><span class="mono">/nutrition/recommend</span></td><td>Mifflin-St Jeor-ধাঁচের ক্যালরি সূত্র + রোগভিত্তিক খাবারের স্থির তালিকা + ৩টি meal combo ঘুরিয়ে ৭ দিন</td></tr>
+  <tr><td>POST</td><td><span class="mono">/nutrition/log</span></td><td>একমাত্র যেটি ডাটাবেসে লেখে — <span class="mono">RewardsLedger</span>-এ +৮ পয়েন্ট</td></tr>
+  <tr><td>POST</td><td><span class="mono">/scanner/analyze</span></td><td>ছবি বিশ্লেষণ করে <strong>না</strong>; পণ্যের নামের hash থেকে সংখ্যা বানায়</td></tr>
+  <tr><td>POST</td><td><span class="mono">/voice/upload</span></td><td>একটি নির্দিষ্ট বাংলা বাক্য ফেরত দেয়; কোনো speech-to-text নেই</td></tr>
+  <tr><td>POST</td><td><span class="mono">/health/predict</span></td><td>glucose ও BP থেকে একটি রৈখিক সূত্র</td></tr>
+  <tr><td>POST</td><td><span class="mono">/dna/diet</span></td><td>দুটি <span class="mono">if</span> — lactose ও gluten</td></tr>
+  <tr><td>POST</td><td><span class="mono">/soil/nutrients</span></td><td>pH, nitrogen, iron থেকে গড়</td></tr>
+  <tr><td>POST</td><td><span class="mono">/waste/donate</span></td><td>kg × 2.4 = meals, kg × 1.9 = CO₂ kg</td></tr>
+  <tr><td>POST</td><td><span class="mono">/doctors/consultations/book</span></td><td>শুধু <span class="mono">{status:"requested"}</span> echo করে</td></tr>
+  <tr><td>POST</td><td><span class="mono">/meal-planner/auto-delivery</span></td><td>শুধু <span class="mono">{status:"scheduled"}</span> echo করে</td></tr>
+</table>
+
+<p class="tableCaption">সারণি ৮ — অবকাঠামো</p>
+<table class="data tight">
+  <tr><th style="width:8%">Method</th><th style="width:24%">Endpoint</th><th>কাজ</th></tr>
+  <tr><td>GET</td><td><span class="mono">/health</span></td><td>Liveness — শুধু “ok”</td></tr>
+  <tr><td>GET</td><td><span class="mono">/ready</span></td><td>Readiness — <span class="mono">SELECT 1</span> চালিয়ে DB সংযোগ যাচাই; ব্যর্থ হলে 503</td></tr>
+  <tr><td>GET</td><td><span class="mono">/openapi.json</span></td><td>OpenAPI 3.0.3 সারাংশ</td></tr>
+</table>
+
+<div class="box warn">
+  <span class="boxTitle">দুটি ছোট অসঙ্গতি — সৎভাবে উল্লেখ করা হলো</span>
+  <p>(১) <span class="mono">/openapi.json</span>-এ <span class="mono">/orders/{orderId}/status</span>
+  <span class="mono">POST</span> হিসেবে লেখা, কিন্তু কোডে এটি <span class="mono">PATCH</span>।
+  (২) SDK-তে দুটি method আছে যার বিপরীতে কোনো route নেই: <span class="mono">oauth()</span>
+  (<span class="mono">/auth/oauth</span>) এবং <span class="mono">pushPrescriptionCart()</span>
+  (<span class="mono">/cart/{userId}/prescription</span>) — এগুলো ডাকলে 404 আসবে।</p>
+</div>

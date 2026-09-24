@@ -1,0 +1,222 @@
+<!--PART:ভাগ ঞ — ভাইভা প্রস্তুতি-->
+<h1 class="chapter" id="ch43"><span class="num">43</span>ভাইভা প্রশ্ন ও উত্তর (৬০+)<span class="mk">[[C43]]</span></h1>
+
+<div class="box info">
+  <span class="boxTitle">কীভাবে ব্যবহার করবেন</span>
+  <p>প্রতিটি প্রশ্নে চারটি অংশ আছে — <strong>সহজ উত্তর</strong> (এক-দুই লাইন, প্রথমেই এটি বলুন),
+  <strong>বিস্তারিত</strong> (বোর্ড আগ্রহ দেখালে), <strong>Technical</strong> (কোডের ভাষায়), এবং
+  <strong>আরও প্রশ্ন করলে</strong> (পরের সম্ভাব্য প্রশ্নের প্রস্তুতি)। সহজ উত্তরগুলো মুখস্থ করুন,
+  বাকিটা বুঝে রাখুন।</p>
+</div>
+
+<h2>A. সাধারণ প্রজেক্ট প্রশ্ন</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১: আপনার প্রজেক্টটি কী নিয়ে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Fair Harvest একটি full-stack digital agricultural marketplace, যেখানে সরকারি Farmer Card দিয়ে verified কৃষকরা সরাসরি ক্রেতাদের কাছে পণ্য বিক্রি করতে পারেন, আর ক্রেতা প্রতিটি পণ্যের মাটি-থেকে-প্লেট ইতিহাস দেখতে পারেন।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>এটি তিনটি সমস্যা একসাথে সমাধান করে — কৃষক যাচাইয়ের অভাব, বিক্রেতার ব্যাপারে অনাস্থা, এবং পণ্যের উৎস না জানা। এর জন্য তিনটি ব্যবস্থা আছে: Farmer Card verification, স্বয়ংক্রিয় reputation score, এবং TraceEvent-ভিত্তিক traceability। এর উপরে সাধারণ e-commerce অংশ — cart, checkout, order, review।</p>
+  <p><span class="lbl">Technical</span><br>Next.js 15 App Router-এ একটিই deployment, যা UI এবং <span class="mono">/api/v1</span>-এর ৬৪টি REST endpoint দুটোই পরিবেশন করে। Prisma ORM দিয়ে PostgreSQL (Neon), JWT authentication, Vercel-এ deploy, ছবি Vercel Blob-এ।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “তাহলে অন্য সাইট থেকে আলাদা কী?” → verification gate, purchase-gated review এবং soft delete-এর উদাহরণ দিন।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২: এই প্রজেক্টটি কেন বেছে নিলেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>বাংলাদেশের কৃষক মধ্যস্বত্বভোগীর কারণে ন্যায্য দাম পান না, আর শহরের ক্রেতা জানেন না তার খাবার কোথা থেকে এসেছে। একটি প্রযুক্তিগত সমাধান দুটি সমস্যাই একসাথে ধরতে পারে।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>শুধু একটি অনলাইন দোকান বানালে সমস্যা সমাধান হয় না — কারণ মূল সমস্যা <em>বিশ্বাস</em>। তাই আমি ইচ্ছাকৃতভাবে verification, reputation ও traceability-কে প্রজেক্টের কেন্দ্র বানিয়েছি, e-commerce অংশকে নয়।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “এটি কি বাস্তবে ব্যবহার করা যাবে?” → “মূল কাঠামো প্রস্তুত; বাস্তব ব্যবহারের জন্য প্রকৃত payment gateway, ডেলিভারি সংযোগ ও সরকারি API দরকার — অধ্যায় 42-এ পথও বলা আছে।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩: আপনার প্রজেক্টের সবচেয়ে গুরুত্বপূর্ণ অংশ কোনটি?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Farmer verification gate। কারণ পুরো প্ল্যাটফর্মের প্রতিশ্রুতিই হলো “verified কৃষকের কাছ থেকে কিনছেন”।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">POST /api/v1/products</span>-এ একটি শর্ত: <span class="mono">if (farmer.verificationStatus !== "VERIFIED") throw new ApiError(…, 403)</span>। এই একটি লাইনই পুরো ব্যবসায়িক নিয়মটি প্রয়োগ করে। একই নিয়ম ছবি আপলোডেও আছে।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">app/api/v1/products/route.js</span></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৪: কতটুকু কোড আপনি নিজে লিখেছেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>সম্পূর্ণ application কোড — schema, ৬৪টি API handler, সব React পেজ ও component, এবং SDK প্যাকেজটিও।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>বাইরের লাইব্রেরি হিসেবে ব্যবহার করেছি Next.js, React, Prisma, Zod, bcryptjs, jsonwebtoken, lucide-react ও @vercel/blob। CSS কোনো framework ছাড়া হাতে লেখা।</p>
+</div>
+
+<h2>B. প্রযুক্তি নির্বাচন</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৫: Next.js কেন? শুধু React ব্যবহার করলে কী হতো?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>শুধু React হলে API-র জন্য আলাদা একটি Express server লাগত। Next.js-এ frontend ও backend একই প্রজেক্টে থাকে।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>এতে চারটি সুবিধা পেয়েছি — (১) একবারে deploy, (২) CORS-এর জটিলতা নেই কারণ same-origin, (৩) Server Component দিয়ে SEO-বান্ধব HTML, (৪) একই কোড দুই দিকে ভাগ করা যায়।</p>
+  <p><span class="lbl">Technical</span><br>App Router-এ <span class="mono">app/api/v1/**/route.js</span> ফাইলগুলোই backend। প্রতিটি HTTP method একটি export করা async function।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “Server আর Client Component-এর পার্থক্য?” → “Server Component-এর JS ব্রাউজারে যায় না, তাই হালকা ও SEO-বান্ধব; কিন্তু সেখানে state বা onClick রাখা যায় না। আমার হোমপেজ, product detail ও trace পেজ server component; dashboard ও form-গুলো client।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৬: Prisma কেন? সরাসরি SQL লিখলে কী সমস্যা?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Prisma একটি ORM — schema থেকেই ডাটাবেস, migration ও query-র টাইপ সব তৈরি হয়, আর SQL injection-এর ঝুঁকি কমে।</p>
+  <p><span class="lbl">Technical</span><br>Prisma সবসময় parameterized query তৈরি করে, তাই ব্যবহারকারীর লেখা কখনো SQL-এর অংশ হয় না। <span class="mono">include</span> দিয়ে relation একসাথে আনা যায়, আর <span class="mono">$transaction</span> দিয়ে atomic কাজ করা যায় — আমার checkout ঠিক এটাই ব্যবহার করে।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “ORM-এর অসুবিধা?” → “খুব জটিল query-তে হাতে লেখা SQL দ্রুততর হতে পারে, এবং ORM কী SQL তৈরি করছে তা না জানলে N+1 সমস্যা হতে পারে। আমার প্রজেক্টে query সরল, তাই সমস্যা হয়নি।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৭: PostgreSQL কেন? MongoDB বা MySQL নয় কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>আমার ডেটা সম্পূর্ণ relational — user, farmer, product, order, review সব একে অন্যের সাথে যুক্ত। তাই relational database-ই স্বাভাবিক পছন্দ।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>MongoDB হলে foreign key, cascade, RESTRICT আর transaction-এর নিশ্চয়তা কোডে হাতে লিখতে হতো। আমার soft delete-এর পুরো ভিত্তিই <span class="mono">OrderItem → Product</span>-এর RESTRICT সম্পর্ক। PostgreSQL বেছে নেওয়ার বিশেষ কারণ — native <span class="mono">enum</span> সমর্থন (আমার ১৩টি enum আছে) এবং Neon-এর serverless free tier।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “SQLite থেকে সরালেন কেন?” → “SQLite একটি ফাইল; Vercel-এর serverless ফাইল সিস্টেম read-only ও ক্ষণস্থায়ী, তাই production-এ ডেটা টিকত না।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৮: JWT কেন? Session কেন নয়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>JWT stateless — server-এ কোনো session টেবিল রাখতে হয় না, তাই serverless পরিবেশে ভালো কাজ করে।</p>
+  <p><span class="lbl">Technical</span><br>Vercel-এ প্রতিটি request আলাদা function instance-এ চলতে পারে, যাদের মধ্যে কোনো ভাগ করা memory নেই। Session-ভিত্তিক auth-এ প্রতিবার ডাটাবেসে গিয়ে session দেখতে হতো। JWT-তে signature যাচাই করেই পরিচয় পাওয়া যায় — কোনো DB call ছাড়াই।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “JWT-র অসুবিধা?” → “বাতিল করা কঠিন। আমার প্রজেক্টে logout শুধু localStorage মুছে; token তার ২ ঘণ্টার মেয়াদ পর্যন্ত প্রযুক্তিগতভাবে বৈধ থাকে। সমাধান হতো refresh token বা blacklist।” — এই স্বীকারোক্তিটি বোর্ড পছন্দ করেন।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৯: REST কেন, GraphQL নয় কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>REST সরল, সবাই জানে, আর Next.js-এর route handler-এর সাথে স্বাভাবিকভাবে মেলে।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>GraphQL তখন লাগে যখন ক্লায়েন্টভেদে ভিন্ন ভিন্ন আকারের ডেটা দরকার। আমার ক্ষেত্রে ক্লায়েন্ট একটিই। তাছাড়া GraphQL-এ caching ও rate limiting বসানো তুলনামূলক জটিল।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১০: Vercel কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Vercel-ই Next.js-এর নির্মাতা, তাই App Router-এর সব সুবিধা সেখানে সরাসরি কাজ করে; সাথে git push করলেই স্বয়ংক্রিয় deploy।</p>
+  <p><span class="lbl">Technical</span><br>Preview deployment (প্রতিটি branch-এর আলাদা URL), স্বয়ংক্রিয় HTTPS, CDN, environment variable ব্যবস্থাপনা এবং Vercel Blob — সব একই জায়গায়। build কমান্ডে <span class="mono">prisma migrate deploy</span> রাখায় প্রতিটি deploy-এ ডাটাবেসও হালনাগাদ হয়ে যায়।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১১: Vercel Blob কেন? ছবি ডাটাবেসে রাখলেন না কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>ছবির bytes ডাটাবেসে রাখলে ডাটাবেস দ্রুত বড় হয়ে ধীর হয়ে যেত। তাই ছবি object storage-এ, আর ডাটাবেসে শুধু URL।</p>
+  <p><span class="lbl">Technical</span><br>Production-এ local disk ব্যবহার করা <em>সম্ভবই নয়</em> — serverless ফাইল সিস্টেম <span class="mono">/tmp</span> ছাড়া read-only এবং প্রতিটি invocation-এর পর মুছে যায়। আমার প্রজেক্টে বাস্তবে এই ত্রুটিটি এসেছিল: <span class="mono">ENOENT … mkdir '/var/task/…/storage'</span>। সমাধান — <span class="mono">STORAGE_PROVIDER=object</span>।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">lib/server/storage/objectStorageProvider.js</span></p>
+</div>
+
+<h2>C. Authentication ও Authorization</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১২: Authentication আর Authorization-এর পার্থক্য কী?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>Authentication = “তুমি কে?” (পরিচয় প্রমাণ)। Authorization = “তুমি কী করতে পারবে?” (অধিকার যাচাই)।</p>
+  <p><span class="lbl">Technical</span><br>আমার কোডে দুটি আলাদা জায়গায়: authentication হয় <span class="mono">/auth/login</span>-এ bcrypt দিয়ে পাসওয়ার্ড মিলিয়ে JWT দেওয়ার সময়; authorization হয় প্রতিটি route-এ <span class="mono">requireRole</span> বা <span class="mono">requireOwnerOrRole</span> দিয়ে।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৩: পাসওয়ার্ড কীভাবে সংরক্ষণ করেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কখনোই plain text-এ নয়। bcrypt দিয়ে hash করে রাখি, cost factor ১০।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">bcrypt.hash(password, 10)</span>। bcrypt নিজে থেকেই প্রতিটি পাসওয়ার্ডের জন্য আলাদা salt তৈরি করে, তাই একই পাসওয়ার্ডের দুজন ব্যবহারকারীর hash আলাদা হয় — rainbow table আক্রমণ কাজ করে না। যাচাইয়ের সময় <span class="mono">bcrypt.compare()</span>, কারণ hash থেকে মূল পাসওয়ার্ড ফেরত পাওয়া যায় না।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “cost 10 মানে কী?” → “২¹⁰ = ১০২৪ বার hashing round। ইচ্ছাকৃতভাবে ধীর, যাতে আক্রমণকারী সেকেন্ডে লক্ষ লক্ষ পাসওয়ার্ড পরীক্ষা করতে না পারে।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৪: JWT-তে কী কী থাকে? কেউ কি সেটি পাল্টে ফেলতে পারে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>ভিতরে থাকে user id, role, email আর মেয়াদ। কেউ পাল্টালে signature মেলে না, তাই server সঙ্গে সঙ্গে বাতিল করে দেয়।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">jwt.sign({ sub: user.id, role, email }, JWT_SECRET, { expiresIn: "2h" })</span> — HS256 অ্যালগরিদম। Payload base64-এ থাকে, তাই কেউ <em>পড়তে</em> পারে; কিন্তু <em>বদলাতে</em> পারে না, কারণ signature তৈরি করতে <span class="mono">JWT_SECRET</span> লাগে।</p>
+  <p class="where"><span class="lbl">আরও প্রশ্ন করলে</span> — “তাহলে payload-এ গোপন তথ্য রাখা যায়?” → “না, একেবারেই নয়। তাই আমি শুধু id, role আর email রেখেছি।”</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৫: টোকেন localStorage-এ রাখা কি নিরাপদ?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>সম্পূর্ণ নিরাপদ নয় — XSS হলে JavaScript সেটি পড়তে পারে। HttpOnly cookie বেশি নিরাপদ হতো।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>এটি আমি জেনেবুঝেই করেছি: localStorage সহজ এবং CSRF-মুক্ত। HttpOnly cookie নিলে XSS থেকে রক্ষা পেতাম, কিন্তু তখন CSRF token লাগত। বাস্তব production-এ আমি HttpOnly cookie + refresh token ব্যবহার করতাম — এটি অধ্যায় 42-এ future scope হিসেবে লেখা আছে।</p>
+  <p class="where"><span class="lbl">টিপ</span> এই প্রশ্নে “হ্যাঁ নিরাপদ” বলবেন না। trade-off বুঝে উত্তর দিলে নম্বর বেশি।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৬: ভুল পাসওয়ার্ড আর ভুল ইমেইল — দুটোতেই একই বার্তা কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>যাতে আক্রমণকারী বুঝতে না পারে কোন ইমেইলটি সিস্টেমে আছে।</p>
+  <p><span class="lbl">Technical</span><br>এটিকে বলে <em>user enumeration</em> প্রতিরোধ। “এই ইমেইল নেই” বললে আক্রমণকারী আগে বৈধ ইমেইলের তালিকা বানিয়ে তারপর শুধু সেগুলোতে পাসওয়ার্ড অনুমান করত। আমার কোডে তিনটি ক্ষেত্রেই একই বার্তা — ব্যবহারকারী নেই, suspended, বা পাসওয়ার্ড ভুল।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৭: আমি যদি URL-এ অন্যের userId বসিয়ে দিই?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>403 পাবেন। প্রতিটি route মালিকানা যাচাই করে।</p>
+  <p><span class="lbl">Technical</span><br>এই আক্রমণকে বলে <strong>IDOR</strong>। <span class="mono">requireOwnerOrRole(request, userId, ["ADMIN"])</span> JWT-র <span class="mono">session.userId</span>-এর সাথে URL-এর id মিলিয়ে দেখে। আর wishlist, farmer/orders ও farmer/earnings-এ আমি URL-এ id রাখিইনি — সেগুলো সবসময় session থেকে নেওয়া, তাই আক্রমণের সুযোগই নেই।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">lib/server/auth.js</span> · <span class="mono">app/api/v1/cart/[userId]/route.js</span></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৮: RoleGuard দিয়েই তো পেজ আটকানো আছে — সেটাই কি যথেষ্ট নয়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>না। RoleGuard শুধু UI-এর সুবিধা। কেউ সরাসরি API-তে request পাঠালে সেটি কোনো কাজেই আসত না।</p>
+  <p><span class="lbl">Technical</span><br>client-side যেকোনো কিছু ব্যবহারকারী বদলে ফেলতে পারে — JavaScript বন্ধ করা যায়, বা <span class="mono">curl</span> দিয়ে সরাসরি endpoint-এ যাওয়া যায়। তাই আসল সিদ্ধান্ত সবসময় server-এ। আমার RoleGuard ফাইলের কমেন্টেই লেখা আছে: <em>“This is a user-experience guard only… that server check is what actually secures the data.”</em></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ১৯: কেউ কি নিজেকে admin বানিয়ে register করতে পারবে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>না। register schema-তে role হিসেবে শুধু <span class="mono">consumer</span> ও <span class="mono">farmer</span> অনুমোদিত।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">role: z.enum(["consumer", "farmer"]).default("consumer")</span> — Zod <span class="mono">"admin"</span> পাঠালে 422 দেবে। Admin অ্যাকাউন্ট হাতে (seed দিয়ে) তৈরি করতে হয়, আর <span class="mono">/admin/login</span> পেজে register বোতামও নেই (<span class="mono">allowRegister={false}</span>)।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২০: JWT_SECRET ফাঁস হয়ে গেলে কী হবে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>যে কেউ নিজের জন্য admin token বানিয়ে ফেলতে পারত — তাই এটি সবচেয়ে গুরুত্বপূর্ণ গোপন মান।</p>
+  <p><span class="lbl">Technical</span><br>সেজন্যই এটি কখনো কোডে লেখা হয়নি, শুধু environment variable-এ। এবং production-এ এটি না থাকলে অ্যাপ ইচ্ছাকৃতভাবে চালু হতেই অস্বীকার করে — নাহলে development-এর জানা ডিফল্ট secret দিয়ে যে কেউ token বানাতে পারত।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">lib/server/auth.js</span>-এর প্রথম কয়েক লাইন</p>
+</div>
+
+<h2>D. Farmer Verification ও Farmer Card</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২১: Farmer Card verification কীভাবে কাজ করে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কৃষক Farmer Card নম্বর, NID আর নাম দেন। সিস্টেম সেটি একটি registry-তে খুঁজে দেখে। তিনটিই মিললে সঙ্গে সঙ্গে verified; না মিললে admin হাতে দেখেন।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">POST /farmers/{id}/verify</span> → rate limit ৮/মিনিট → <span class="mono">requireOwnerOrRole</span> → Zod → <span class="mono">verifyFarmerCard()</span> → <span class="mono">GovFarmerCardRecord.findUnique({ cardNumber })</span> → status ACTIVE কি না → NID ও normalize করা নাম মিলিয়ে দেখা → মিললে <span class="mono">matched: true, confidence: 0.98</span> → profile <span class="mono">VERIFIED</span> → <span class="mono">recomputeFarmerReputation()</span>।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">lib/server/verification/demoRegistryProvider.js</span></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২২: এটি কি সত্যিকারের সরকারি API?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br><strong>না।</strong> এটি একটি demo registry — আমার নিজের ডাটাবেসের <span class="mono">GovFarmerCardRecord</span> টেবিল, যেখানে seed দিয়ে ৮টি নমুনা কার্ড রাখা।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>বাংলাদেশে শিক্ষার্থীর জন্য উন্মুক্ত কোনো Farmer Card API নেই। তাই আমি provider abstraction বানিয়েছি: <span class="mono">demoRegistryProvider.js</span> এখন চলে, আর <span class="mono">officialGovApiProvider.js</span> লেখা আছে সঠিক request/response আকারে। ভবিষ্যতে আসল API পেলে শুধু <span class="mono">VERIFICATION_PROVIDER=official</span> করে দিলেই হবে — route, schema বা frontend-এর একটি লাইনও বদলাতে হবে না।</p>
+  <p class="where"><span class="lbl">টিপ</span> এই প্রশ্নটি প্রায় নিশ্চিতভাবে আসবে। সরাসরি “না” বলে তারপর abstraction-এর কথা বলুন — এতে দুর্বলতা শক্তিতে বদলে যায়।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৩: কার্ড নম্বর ঠিক কিন্তু নাম ভুল হলে?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br><span class="mono">matched: false</span>, confidence ০.৫, কারণ <span class="mono">details_mismatch</span>। profile PENDING থাকে এবং admin-এর কাছে চলে যায়।</p>
+  <p><span class="lbl">Technical</span><br>নাম মেলানোর আগে <span class="mono">trim().toLowerCase().replace(/\s+/g, " ")</span> করা হয়, তাই বাড়তি স্পেস বা বড়-ছোট হরফে সমস্যা হয় না। তবে বানান ভুল হলে মিলবে না — fuzzy matching নেই।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৪: verified না হলে কৃষক কী করতে পারেন না?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>পণ্য তালিকাভুক্ত করতে পারেন না এবং ছবিও আপলোড করতে পারেন না। login, dashboard দেখা ও verification জমা দেওয়া — এইটুকুই।</p>
+  <p><span class="lbl">Technical</span><br>দুই জায়গায় gate: <span class="mono">products/route.js</span>-এর POST এবং <span class="mono">uploads/product-image/route.js</span>। দ্বিতীয়টি রাখার কারণ — নাহলে কেউ প্ল্যাটফর্মকে ফ্রি file hosting হিসেবে ব্যবহার করত।</p>
+  <p class="where"><span class="lbl">ডেমোতে দেখান</span> Rahim (verified) ও Karim (pending) — একই dashboard সম্পূর্ণ আলাদা দেখায় (চিত্র 28 ও 29)।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৫: Admin-এর সিদ্ধান্ত কোথাও রেকর্ড হয়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>হ্যাঁ। দুই জায়গায় — <span class="mono">FarmerProfile.verifiedByAdminId</span>-এ কোন admin, আর <span class="mono">AuditLog</span>-এ সম্পূর্ণ ঘটনা।</p>
+  <p><span class="lbl">Technical</span><br><span class="mono">verifiedByAdminId</span> একটি self-relation — User মডেলে <span class="mono">verifiedFarmers FarmerProfile[] @relation("VerifiedByAdmin")</span>। AuditLog-এ action হয় <span class="mono">farmer_verification_approved</span> নয়তো <span class="mono">_rejected</span>।</p>
+</div>
+
+<h2>E. Reputation</h2>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৬: Reputation score কীভাবে হিসাব হয়? সূত্রটি বলুন।</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>তিনটি সংকেতের weighted average — verification ৩৫%, review rating ৪০%, delivery সম্পূর্ণতা ২৫%।</p>
+  <p><span class="lbl">Technical</span><br>
+  <span class="mono">Score = clamp(0.35 × S<sub>ver</sub> + 0.40 × S<sub>rev</sub> + 0.25 × S<sub>del</sub>)</span><br>
+  যেখানে S<sub>ver</sub> = VERIFIED→90, PENDING→60, REJECTED→30; S<sub>rev</sub> = (গড় rating ÷ 5) × 100, review না থাকলে 70; S<sub>del</sub> = (delivered ÷ মোট order item) × 100, order না থাকলে 75।</p>
+  <p><span class="lbl">উদাহরণ (আমার চালু সিস্টেম থেকে)</span><br>Rahim Uddin — verified (90), একটি ৫-তারা review (100), একটি DELIVERED item (100)। → 90×0.35 + 100×0.40 + 100×0.25 = 31.5 + 40 + 25 = <strong>96.5 → 97</strong> → badge “Trusted Seller”।</p>
+  <p class="where"><span class="lbl">কোথায়</span> <span class="mono">lib/server/reputation.js</span></p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৭: নতুন কৃষক, যার কোনো review নেই — তার score কত?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>review ও delivery-র জন্য নিরপেক্ষ ভিত্তি ধরা হয় (70 ও 75), শূন্য নয়।</p>
+  <p><span class="lbl">বিস্তারিত</span><br>শূন্য ধরলে একজন সৎ নতুন কৃষক শুরুতেই “খারাপ” দেখাতেন, অথচ তিনি কিছু ভুল করেননি। এটি একটি সচেতন ন্যায্যতার সিদ্ধান্ত — কোডের কমেন্টেও লেখা আছে। তাই নতুন verified কৃষকের score হয় 90×0.35 + 70×0.40 + 75×0.25 = 31.5 + 28 + 18.75 = <strong>78</strong> → “Reliable Farmer”।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৮: Score কখন আপডেট হয়?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>চারটি ঘটনায় — নতুন review, verification সিদ্ধান্ত, order DELIVERED/CANCELLED হওয়া, এবং admin কোনো review hide/republish করলে।</p>
+  <p><span class="lbl">Technical</span><br>দুটি আলাদা ফাংশন আছে: <span class="mono">getFarmerReputationBreakdown()</span> শুধু গণনা করে (GET route-এ ব্যবহৃত, কিছু লেখে না), আর <span class="mono">recomputeFarmerReputation()</span> গণনা করে ডাটাবেসে লিখে রাখে। GET request-এ ডাটাবেস লেখা উচিত নয় বলেই এই দুটি আলাদা।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ২৯: প্রতিবার গণনা না করে ডাটাবেসে লিখে রাখেন কেন?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>কারণ marketplace-এর প্রতিটি কার্ডে score দেখাতে গেলে প্রতিটি কৃষকের জন্য আলাদা করে review ও order গোনা লাগত — অনেক query।</p>
+  <p><span class="lbl">Technical</span><br>এটিকে বলে <em>materialized value</em> বা computed-column caching। খরচ হলো — event-এ recompute করতে ভুলে গেলে মান পুরোনো হয়ে যেতে পারে। তাই আমি ঠিক চারটি জায়গায় recompute কল রেখেছি এবং সেগুলো নথিভুক্ত।</p>
+</div>
+
+<div class="qa">
+  <p class="q">প্রশ্ন ৩০: Product-এর trust score আর farmer-এর reputation কি একই?</p>
+  <p><span class="lbl">সহজ উত্তর</span><br>না, সম্পূর্ণ আলাদা। Farmer reputation স্বয়ংক্রিয়ভাবে গণনা হয়; <span class="mono">Product.trustScore</span> এখনো একটি স্থির মান (ডিফল্ট ৮০)।</p>
+  <p><span class="lbl">সৎ স্বীকারোক্তি</span><br>marketplace কার্ডে যে “91%” দেখা যায় সেটি seed-এ হাতে বসানো। কোনো API এটি স্বয়ংক্রিয়ভাবে বদলায় না। ভবিষ্যতে trace-এর সম্পূর্ণতা, সেই পণ্যের review ও কৃষকের reputation মিলিয়ে এটিও গণনা করা যেত।</p>
+</div>

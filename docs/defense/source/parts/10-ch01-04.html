@@ -1,0 +1,221 @@
+<!--PART:ভাগ ক — প্রজেক্ট পরিচিতি-->
+<h1 class="chapter" id="ch1"><span class="num">1</span>প্রজেক্ট পরিচিতি (Project Overview)<span class="mk">[[C1]]</span></h1>
+
+<h2>1.1 এক লাইনে Fair Harvest কী?</h2>
+<p><strong>Fair Harvest একটি full-stack digital agricultural marketplace, যেখানে সরকারি Farmer Card দিয়ে
+verified কৃষকরা তাদের কৃষিপণ্য সরাসরি ক্রেতাদের কাছে বিক্রি করতে পারে, এবং প্রতিটি পণ্যের
+মাটি-থেকে-প্লেট (soil-to-plate) যাত্রা ক্রেতা নিজের চোখে দেখতে পারে।</strong></p>
+
+<p><span class="mono">Full-stack</span> মানে হলো — frontend (যা ব্যবহারকারী চোখে দেখে) এবং backend
+(business logic, authentication, database, API) দুটোই একই application-এর ভিতরে আছে। এখানে আলাদা কোনো
+backend server নেই; Next.js একই সাথে UI render করে এবং <span class="mono">app/api/v1/**</span> ফোল্ডারে
+REST API চালায়।</p>
+
+<h2>1.2 কেন এই প্রজেক্ট বানানো হলো?</h2>
+<p>বাংলাদেশে একজন কৃষক ফসল ফলানোর পর সাধারণত সরাসরি ক্রেতার কাছে পৌঁছাতে পারেন না। মাঝখানে কয়েক ধাপ
+মধ্যস্বত্বভোগী থাকে। ফলে দুটো সমস্যা একসাথে হয় —</p>
+<ul>
+  <li>কৃষক ন্যায্য দাম পান না, কারণ তিনি দাম নির্ধারণ করতে পারেন না।</li>
+  <li>ক্রেতা জানেন না পণ্যটি আসলে কে ফলিয়েছে, কোথায় ফলিয়েছে, কবে তোলা হয়েছে।</li>
+</ul>
+<p>Fair Harvest এই দুই পক্ষকে সরাসরি একটি প্ল্যাটফর্মে আনে, এবং মাঝখানে যে <strong>বিশ্বাসের অভাব</strong>
+তৈরি হতো সেটি পূরণ করার জন্য তিনটি আলাদা ব্যবস্থা রাখে: farmer verification, reputation score এবং
+traceability।</p>
+
+<h2>1.3 একটি সাধারণ e-commerce সাইট থেকে এটি আলাদা কেন?</h2>
+<table class="data">
+  <tr><th style="width:34%">সাধারণ e-commerce</th><th>Fair Harvest</th></tr>
+  <tr><td>যে কেউ seller হিসেবে register করে সাথে সাথে পণ্য বিক্রি করতে পারে</td>
+      <td>কৃষককে আগে <strong>Government Farmer Card verification</strong> পাস করতে হয়; verified না হলে
+      <span class="mono">POST /api/v1/products</span> সরাসরি <span class="mono">403</span> ফেরত দেয়</td></tr>
+  <tr><td>seller rating সাধারণত শুধু review-এর গড়</td>
+      <td>reputation তিনটি সংকেত থেকে গণনা হয় — verification status, review rating এবং delivery সম্পূর্ণতার হার</td></tr>
+  <tr><td>পণ্যের উৎস সম্পর্কে কিছু জানা যায় না</td>
+      <td>প্রতিটি পণ্যের ছয় ধাপের trace timeline আছে (PLANTED → HARVESTED → LAB_TESTED → PACKAGED → SHIPPED → LISTED)</td></tr>
+  <tr><td>যে কেউ review দিতে পারে</td>
+      <td>review দিতে হলে সেই পণ্যের একটি <strong>DELIVERED</strong> order item থাকতেই হবে — server নিজে যাচাই করে, client-এর কথায় বিশ্বাস করে না</td></tr>
+  <tr><td>পণ্য মুছে ফেললে ইতিহাস হারিয়ে যায়</td>
+      <td>hard delete নেই; পণ্য শুধু <span class="mono">ARCHIVED</span> হয়, তাই পুরোনো order ও review অক্ষত থাকে</td></tr>
+</table>
+
+<h2>1.4 কে কে ব্যবহার করে?</h2>
+<p>তিন ধরনের ব্যবহারকারী আছে, এবং database-এ এদের <span class="mono">Role</span> enum দিয়ে আলাদা করা হয়:
+<span class="mono">CONSUMER</span>, <span class="mono">FARMER</span>, <span class="mono">ADMIN</span>।</p>
+<ul>
+  <li><strong>CONSUMER (ক্রেতা)</strong> — marketplace ঘুরে পণ্য দেখে, cart-এ রাখে, checkout করে, order track করে, delivered পণ্যের review দেয়।</li>
+  <li><strong>FARMER (কৃষক)</strong> — Farmer Card verify করে, পণ্য যোগ/সম্পাদনা করে, ছবি upload করে, trace event লেখে, নিজের order ও earnings দেখে।</li>
+  <li><strong>ADMIN (প্রশাসক)</strong> — verification queue দেখে approve/reject করে, account suspend করে, সব পণ্য ও order নিয়ন্ত্রণ করে, review moderate করে, audit log দেখে।</li>
+</ul>
+
+<h2>1.5 Admin-এর ভূমিকা কী?</h2>
+<p>Admin এই সিস্টেমে বিক্রি করে না, কেনেও না। Admin হলো <strong>নিরপেক্ষ তত্ত্বাবধায়ক</strong>। যে
+কৃষকের Farmer Card স্বয়ংক্রিয়ভাবে মেলেনি, তার আবেদন admin হাতে দেখে সিদ্ধান্ত দেন। কোনো অ্যাকাউন্ট
+খারাপ আচরণ করলে admin সেটি suspend করতে পারেন। এবং admin-এর প্রতিটি গুরুত্বপূর্ণ কাজ
+<span class="mono">AuditLog</span> টেবিলে লিখে রাখা হয় — যাতে পরে কে কী করেছে তা প্রমাণ করা যায়।</p>
+
+<h2>1.6 English technical summary</h2>
+<div class="box info">
+<p style="text-align:left">Fair Harvest is a single-deployment Next.js 15 App Router application that serves both the
+user interface and a versioned REST API under <span class="mono">/api/v1</span>. Persistence is handled by
+Prisma ORM against PostgreSQL (Neon in production). Authentication uses stateless HS256 JWTs held in
+<span class="mono">localStorage</span>; authorization is enforced server-side on every route through
+<span class="mono">requireUser</span>, <span class="mono">requireRole</span> and
+<span class="mono">requireOwnerOrRole</span>. The platform's differentiators — Government Farmer Card
+verification, a multi-signal farmer reputation score, purchase-gated reviews, and a farmer-authored
+soil-to-plate trace log — are all implemented as real database-backed features rather than static content.</p>
+</div>
+
+<figure class="wide">
+  <img src="shots/01-home.png" alt="Fair Harvest homepage">
+  <figcaption class="caption">চিত্র 1: Fair Harvest হোমপেজ (<span class="mono">/</span>) — hero সেকশন ও operations cockpit ড্যাশবোর্ড।</figcaption>
+</figure>
+<p>এই হোমপেজটি একটি <strong>React Server Component</strong>; এটি server-এ render হওয়ার সময় SDK দিয়ে
+নিজের API-কে ডাকার চেষ্টা করে। যে module-গুলোর জন্য login বা seeded data দরকার, সেগুলোর জন্য preview/demo
+মান দেখায় এবং পৃষ্ঠার উপরে হলুদ ব্যানারে সেটা স্পষ্ট করে লিখে দেয় — এটি ইচ্ছাকৃত সততা, লুকানো নয়।</p>
+
+
+<h1 class="chapter" id="ch2"><span class="num">2</span>সমস্যা বিবরণ (Problem Statement)<span class="mk">[[C2]]</span></h1>
+
+<p>নিচের প্রতিটি সমস্যা এই প্রজেক্টে সত্যিই কোড দিয়ে সমাধান করার চেষ্টা করা হয়েছে — অর্থাৎ প্রতিটির
+বিপরীতে একটি বাস্তব module আছে। যেগুলোর সমাধান নেই সেগুলো আলাদা করে অধ্যায় 41-এ বলা আছে।</p>
+
+<table class="data">
+  <tr><th style="width:26%">সমস্যা</th><th style="width:37%">ব্যাখ্যা (সহজ বাংলায়)</th><th>Fair Harvest-এ কীভাবে মোকাবিলা করা হয়েছে</th></tr>
+  <tr>
+    <td><strong>কৃষক যাচাইয়ের অভাব</strong><br>Lack of farmer verification</td>
+    <td>অনলাইনে যে কেউ নিজেকে কৃষক বলে দাবি করতে পারে। ক্রেতার কাছে সেটা যাচাই করার উপায় থাকে না।</td>
+    <td>Government Farmer Card + NID + নাম মিলিয়ে দেখা হয় <span class="mono">GovFarmerCardRecord</span>
+    টেবিলের সাথে। না মিললে admin manual review করেন। verified না হলে পণ্য তালিকাভুক্তই করা যায় না।
+    <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+  <tr>
+    <td><strong>বিশ্বাসের ঘাটতি</strong><br>Trust gap</td>
+    <td>ক্রেতা বুঝতে পারেন না কোন বিক্রেতা নির্ভরযোগ্য, কোনটি নয়।</td>
+    <td><span class="mono">reputationScore</span> (0–100) ও badge, যা verification, review rating ও
+    delivery rate থেকে স্বয়ংক্রিয়ভাবে গণনা হয় এবং প্রতিটি ঘটনার পর আপডেট হয়।
+    <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+  <tr>
+    <td><strong>পণ্যের উৎস অজানা</strong><br>No traceability</td>
+    <td>বাজারের শাক কোথা থেকে এলো, কবে তোলা হলো — কিছুই জানার উপায় নেই।</td>
+    <td><span class="mono">TraceEvent</span> টেবিল — কৃষক নিজে ছয়টি ধাপ লেখেন, সময় ও GPS সহ।
+    <span class="mono">/trace/[productId]</span> পেজে সবাই দেখতে পারে।
+    <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+  <tr>
+    <td><strong>মধ্যস্বত্বভোগীর কারণে দূরত্ব</strong></td>
+    <td>কৃষক ও ক্রেতার মাঝে অনেক ধাপ, তাই দামও বাড়ে, তথ্যও হারায়।</td>
+    <td>কৃষক নিজে দাম ও stock লেখেন; ক্রেতা সরাসরি সেই listing থেকে কেনেন। কোনো
+    middleman entity ডাটাবেসে নেই। <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+  <tr>
+    <td><strong>তাজা থাকার সময় অজানা</strong><br>Freshness</td>
+    <td>কত দিনের মধ্যে খাওয়া উচিত তা লেখা থাকে না।</td>
+    <td>প্রতিটি পণ্যে <span class="mono">freshnessWindowDays</span> ফিল্ড আছে, যা কৃষক নিজে দেন এবং
+    marketplace কার্ডে বার হিসেবে দেখানো হয়।
+    <br><span class="chip part">আংশিক — এটি কৃষকের দেওয়া তথ্য, কোনো sensor নয়</span></td>
+  </tr>
+  <tr>
+    <td><strong>ভুয়া review</strong></td>
+    <td>না কিনেই ৫ তারা দিয়ে দেওয়া যায়, বা একই লোক বারবার review দেয়।</td>
+    <td>Review দিতে হলে সেই product-এর DELIVERED order item থাকতে হবে; তাছাড়া
+    <span class="mono">orderItemId</span> unique এবং <span class="mono">(customerId, productId)</span>
+    unique — ডাটাবেস স্তরেই দ্বিতীয়বার review আটকে যায়।
+    <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+  <tr>
+    <td><strong>manual verification-এর ঝামেলা</strong></td>
+    <td>প্রতিটি কৃষককে হাতে যাচাই করতে গেলে অনেক সময় লাগে।</td>
+    <td>Card-NID-নাম মিললে <strong>তাৎক্ষণিক</strong> verification; না মিললে তবেই admin queue-তে যায়।
+    অর্থাৎ manual কাজ শুধু ব্যতিক্রমের জন্য।
+    <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+  <tr>
+    <td><strong>কেন্দ্রীয় বাজারের অভাব</strong></td>
+    <td>বিচ্ছিন্ন ফেসবুক পেজ/গ্রুপে বিক্রি হয়, খোঁজা কঠিন।</td>
+    <td>একটি marketplace পেজ, category / trust score / price filter এবং search সহ।
+    <br><span class="chip impl">IMPLEMENTED</span></td>
+  </tr>
+</table>
+
+<div class="box bad">
+  <span class="boxTitle">যা এই প্রজেক্ট সমাধান করে না (সৎভাবে বলা)</span>
+  <p>প্রকৃত টাকা লেনদেন, প্রকৃত ডেলিভারি ব্যবস্থাপনা, সরকারি API-র সাথে সত্যিকারের সংযোগ, এবং কৃষককে
+  টাকা পরিশোধ (payout) — এর কোনোটিই এই সংস্করণে নেই। বিস্তারিত অধ্যায় 36 ও 41-এ।</p>
+</div>
+
+
+<h1 class="chapter" id="ch3"><span class="num">3</span>প্রজেক্টের উদ্দেশ্য (Objectives)<span class="mk">[[C3]]</span></h1>
+
+<p>প্রতিটি উদ্দেশ্যের সাথে নিচে বলা আছে — সেটি কেন দরকার, কোড কোথায় আছে, এবং বাস্তবায়নের অবস্থা কী।</p>
+
+<table class="data">
+  <tr><th style="width:4%">#</th><th style="width:24%">উদ্দেশ্য</th><th style="width:30%">কেন দরকার</th><th style="width:28%">দায়িত্বপ্রাপ্ত কোড</th><th style="width:14%">অবস্থা</th></tr>
+  <tr><td>1</td><td>Role-ভিত্তিক নিরাপদ authentication</td><td>তিন ধরনের ব্যবহারকারীকে আলাদা রাখা ও পাসওয়ার্ড নিরাপদ রাখা</td>
+      <td><span class="mono">lib/server/auth.js</span>, <span class="mono">app/api/v1/auth/*</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>2</td><td>Government Farmer Card verification</td><td>শুধু প্রকৃত কৃষক যেন বিক্রি করতে পারেন</td>
+      <td><span class="mono">lib/server/verification/</span>, <span class="mono">api/v1/farmers/[id]/verify</span></td><td><span class="chip impl">সম্পন্ন</span> <span class="chip demo">demo registry</span></td></tr>
+  <tr><td>3</td><td>স্বয়ংক্রিয় farmer reputation</td><td>ক্রেতা যেন সংখ্যা দেখে সিদ্ধান্ত নিতে পারেন</td>
+      <td><span class="mono">lib/server/reputation.js</span>, <span class="mono">reputationSync.js</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>4</td><td>কৃষকের নিজের পণ্য ব্যবস্থাপনা</td><td>দাম ও stock কৃষক নিজে নিয়ন্ত্রণ করবেন</td>
+      <td><span class="mono">api/v1/products/*</span>, <span class="mono">components/products/FarmerProductRow.js</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>5</td><td>প্রকৃত ছবি upload</td><td>পণ্য দেখে কেনার আস্থা</td>
+      <td><span class="mono">lib/server/storage/</span>, <span class="mono">api/v1/uploads/*</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>6</td><td>Trust score সহ marketplace</td><td>খোঁজা ও তুলনা করা সহজ করা</td>
+      <td><span class="mono">app/marketplace/</span>, <span class="mono">api/v1/products</span> (GET)</td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>7</td><td>Cart → checkout → order</td><td>সম্পূর্ণ কেনাকাটার চক্র</td>
+      <td><span class="mono">api/v1/cart/*</span>, <span class="mono">api/v1/orders/[id]/checkout</span></td><td><span class="chip impl">সম্পন্ন</span> <span class="chip demo">payment demo</span></td></tr>
+  <tr><td>8</td><td>Order status ও timeline</td><td>ক্রেতা যেন জানেন অর্ডার কোথায়</td>
+      <td><span class="mono">OrderStatusEvent</span>, <span class="mono">api/v1/orders/[id]/status</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>9</td><td>মাটি-থেকে-প্লেট traceability</td><td>উৎস সম্পর্কে স্বচ্ছতা</td>
+      <td><span class="mono">TraceEvent</span>, <span class="mono">api/v1/trace/[productId]</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>10</td><td>ক্রয়-নির্ভর review</td><td>ভুয়া rating ঠেকানো</td>
+      <td><span class="mono">lib/server/reviews.js</span>, <span class="mono">reviewEligibility.js</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>11</td><td>Admin তত্ত্বাবধান ও moderation</td><td>প্ল্যাটফর্মের মান ধরে রাখা</td>
+      <td><span class="mono">app/admin/*</span>, <span class="mono">api/v1/admin/*</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>12</td><td>Audit trail</td><td>admin-এর কাজের জবাবদিহি</td>
+      <td><span class="mono">lib/server/audit.js</span>, <span class="mono">AuditLog</span> model</td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>13</td><td>অপব্যবহার প্রতিরোধ (rate limiting)</td><td>brute-force ও spam ঠেকানো</td>
+      <td><span class="mono">lib/server/rateLimit.js</span></td><td><span class="chip part">আংশিক — in-memory, একক process</span></td></tr>
+  <tr><td>14</td><td>সংবেদনশীল তথ্য লুকানো</td><td>NID ও Card নম্বর পুরো দেখানো যাবে না</td>
+      <td><span class="mono">lib/server/mask.js</span></td><td><span class="chip impl">সম্পন্ন</span></td></tr>
+  <tr><td>15</td><td>বাংলা/ইংরেজি ভাষা পরিবর্তন</td><td>বাংলাদেশি ব্যবহারকারীর সুবিধা</td>
+      <td><span class="mono">components/i18n/</span>, <span class="mono">lib/i18nDictionary.js</span></td><td><span class="chip part">আংশিক — 177টি স্ট্রিং</span></td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch4"><span class="num">4</span>প্রস্তাবিত সমাধান ও লক্ষ্য ব্যবহারকারী<span class="mk">[[C4]]</span></h1>
+
+<h2>4.1 সমাধানের মূল ধারণা</h2>
+<p>Fair Harvest-এর সমাধান তিনটি স্তম্ভের উপর দাঁড়িয়ে আছে। এই তিনটি একসাথে না থাকলে প্ল্যাটফর্মটি
+আরেকটি সাধারণ দোকান হয়ে যেত।</p>
+
+<table class="data">
+  <tr><th style="width:22%">স্তম্ভ</th><th style="width:40%">কী করে</th><th>প্রমাণ (কোডে কোথায়)</th></tr>
+  <tr><td><strong>১. পরিচয় যাচাই</strong><br>Identity</td>
+      <td>বিক্রেতা সত্যিই কৃষক কি না, তা সরকারি কার্ডের রেকর্ডের সাথে মিলিয়ে দেখা</td>
+      <td><span class="mono">demoRegistryProvider.js</span> — cardNumber lookup, NID ও নাম মিলিয়ে দেখা, confidence 0.98</td></tr>
+  <tr><td><strong>২. আচরণের ইতিহাস</strong><br>Reputation</td>
+      <td>অতীতে কেমন কাজ করেছেন তার ভিত্তিতে একটি সংখ্যা</td>
+      <td><span class="mono">computeReputation()</span> — তিনটি score-এর weighted average</td></tr>
+  <tr><td><strong>৩. পণ্যের ইতিহাস</strong><br>Traceability</td>
+      <td>এই নির্দিষ্ট পণ্যটির কী কী ঘটেছে, কখন</td>
+      <td><span class="mono">TraceEvent</span> rows + <span class="mono">toPublicTrace()</span> serializer</td></tr>
+</table>
+
+<h2>4.2 লক্ষ্য ব্যবহারকারী (Target Users)</h2>
+<table class="data">
+  <tr><th style="width:20%">ব্যবহারকারী</th><th style="width:34%">তাদের প্রধান চাহিদা</th><th>Fair Harvest কী দেয়</th></tr>
+  <tr><td>ছোট ও মাঝারি কৃষক</td><td>নিজের দামে সরাসরি বিক্রি, ক্রেতার আস্থা অর্জন</td>
+      <td>verified badge, reputation score, নিজের dashboard, order ও earnings-এর হিসাব</td></tr>
+  <tr><td>শহুরে সচেতন ক্রেতা</td><td>নিরাপদ ও তাজা খাবার, উৎস জানা</td>
+      <td>trust score, freshness window, trace timeline, verified-farmer badge, review</td></tr>
+  <tr><td>প্ল্যাটফর্ম প্রশাসক</td><td>প্ল্যাটফর্মের মান ও নিরাপত্তা রক্ষা</td>
+      <td>verification queue, account suspend, product ও order নিয়ন্ত্রণ, review moderation, audit log</td></tr>
+</table>
+
+<div class="box info">
+  <span class="boxTitle">ভাইভায় এক লাইনে বলার মতো</span>
+  <p>“Fair Harvest মূলত বিশ্বাসের সমস্যা সমাধান করে — কৃষককে যাচাই করে, তার আচরণকে সংখ্যায় প্রকাশ করে,
+  আর পণ্যের ইতিহাসকে দৃশ্যমান করে। বাকি e-commerce অংশটা (cart, order) এই বিশ্বাসকে কাজে লাগানোর মাধ্যম।”</p>
+</div>

@@ -1,0 +1,336 @@
+<!--PART:ভাগ চ — ড্যাশবোর্ড, তত্ত্বাবধান ও নিরাপত্তা-->
+<h1 class="chapter" id="ch24"><span class="num">24</span>Farmer Dashboard<span class="mk">[[C24]]</span></h1>
+
+<p>ফাইল: <span class="mono">app/farmer/dashboard/page.js</span> · রক্ষাকবচ:
+<span class="mono">app/farmer/layout.js</span> → <span class="mono">&lt;RoleGuard role="farmer"&gt;</span></p>
+
+<figure class="tall">
+  <img src="shots/18-farmer-dashboard" alt="Farmer dashboard">
+  <figcaption class="caption">চিত্র 28: সম্পূর্ণ Farmer Dashboard — verified কৃষক Rahim Uddin হিসেবে লগ-ইন করা অবস্থায় (reputation 97, Trusted Seller)।</figcaption>
+</figure>
+
+<h2>24.1 প্রতিটি অংশ — ব্যবহারকারী কী দেখেন, পিছনে কী ঘটে</h2>
+<table class="data tight">
+  <tr><th style="width:20%">অংশ</th><th style="width:30%">কৃষক যা দেখেন</th><th style="width:26%">কোন API</th><th>টীকা</th></tr>
+  <tr><td>শিরোনাম ও badge</td><td>“Welcome back, &lt;নাম&gt;” এবং ডানে “97% · Trusted Seller”</td>
+      <td><span class="mono">GET /farmers/{id}/score</span></td><td>score না এলে badge দেখানোই হয় না</td></tr>
+  <tr><td>Reputation টাইল</td><td>৯৭</td><td>একই</td>
+      <td>লোড হওয়ার আগে “—” দেখায়। কোডে কমেন্ট আছে: হার্ডকোড করা মান দেখালে সেটি কৃষকের
+      <em>অর্জিত নয় এমন</em> সংখ্যা হতো</td></tr>
+  <tr><td>Active products টাইল</td><td>সংখ্যা</td><td><span class="mono">GET /products?farmer_id=</span></td>
+      <td><span class="chip part">ছোট বাগ</span> লেবেলে “Active” লেখা থাকলেও এটি archived সহ
+      <strong>সব</strong> পণ্য গোনে</td></tr>
+  <tr><td>Orders received টাইল</td><td>নিজের order item-এর সংখ্যা</td><td><span class="mono">GET /farmer/orders</span></td><td>—</td></tr>
+  <tr><td>Average rating টাইল</td><td>গড় তারকা, বা “No reviews yet (0)”</td><td><span class="mono">/score</span></td><td>শূন্য না দেখিয়ে সৎ বার্তা</td></tr>
+  <tr><td><strong>Verification প্যানেল</strong></td><td>verified না হলেই কেবল দেখায় — লাল সতর্কতা ও verify বোতাম</td>
+      <td>session-এর <span class="mono">farmer_verification_status</span></td>
+      <td>একই সাথে “Add product” ফর্ম সম্পূর্ণ লুকিয়ে যায়</td></tr>
+  <tr><td>My products</td><td>প্রতিটি সারিতে ছবি, নাম, category, দাম, stock, status + Edit ও “Mark as listed”</td>
+      <td><span class="mono">GET /products?farmer_id=</span></td>
+      <td>Edit চাপলে সারিটি inline form হয়ে যায় (<span class="mono">FarmerProductRow.js</span>)</td></tr>
+  <tr><td>Add product</td><td>ছবি uploader + নাম, category, দাম, stock</td>
+      <td><span class="mono">POST /uploads/product-image</span> → <span class="mono">POST /products</span></td>
+      <td>category drop-down-এ এখানে শুধু তিনটি (vegetable/fruit/grain) — <em>herb</em> বাদ পড়েছে
+      <span class="chip part">ছোট অসঙ্গতি</span></td></tr>
+  <tr><td>My orders</td><td>সর্বোচ্চ ৮টি order item — পণ্য, পরিমাণ, মোট, status, ক্রেতার নাম</td>
+      <td><span class="mono">GET /farmer/orders</span></td><td>শুধু নিজের item</td></tr>
+  <tr><td>Earnings</td><td>Completed sales, In progress, Cancelled items</td>
+      <td><span class="mono">GET /farmer/earnings</span></td>
+      <td>প্যানেলেই লেখা: “not a confirmed payout — Fair Harvest does not process real farmer payouts yet”</td></tr>
+  <tr><td>Voice Upload</td><td>একটি বোতাম ও নির্দিষ্ট একটি বাংলা বাক্য</td><td><span class="mono">POST /voice/upload</span></td>
+      <td><span class="chip demo">DEMO</span> — UI-তেই লেখা “uses a canned transcript, not real speech-to-text”</td></tr>
+  <tr><td>Reputation breakdown</td><td>চারটি বার: quality, delivery, review, cert</td><td><span class="mono">/score</span></td>
+      <td>quality ও review একই মান দেখায় (দুটোই <span class="mono">review_score</span>)</td></tr>
+</table>
+
+<h2>24.2 Earnings — শব্দচয়নে সততা</h2>
+<pre>// lib/server/earnings.js
+// Deliberately calls this "earnings", never "paid out" or "balance" — no real
+// payout processing exists in this system (COD/demo payment only).
+note: "Reflects order value, not an actual payout — no payment gateway/payout
+       processing exists in this system."</pre>
+<p>এমনকি একটি unit test আছে যার নামই <span class="mono">"never calls this a payout"</span> —
+যা <span class="mono">assert.match(result.note, /not an actual payout/i)</span> দিয়ে নিশ্চিত করে যে
+ভবিষ্যতে কেউ ভুল করে শব্দটি বদলে দিতে পারবে না।</p>
+
+<figure class="wide">
+  <img src="shots/20-farmer-dashboard-unverified" alt="Unverified farmer dashboard">
+  <figcaption class="caption">চিত্র 29: একই dashboard, কিন্তু <strong>unverified</strong> কৃষক (Karim Sheikh) হিসেবে — “Verification required” প্যানেল দেখা যাচ্ছে এবং “Add product” ফর্ম একেবারেই নেই।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch25"><span class="num">25</span>Customer Dashboard<span class="mk">[[C25]]</span></h1>
+
+<p>ফাইল: <span class="mono">app/account/page.js</span> · রক্ষাকবচ:
+<span class="mono">app/account/layout.js</span> → <span class="mono">&lt;RoleGuard role="consumer"&gt;</span></p>
+
+<figure class="wide">
+  <img src="shots/10-customer-account" alt="Customer account dashboard">
+  <figcaption class="caption">চিত্র 30: ক্রেতার ড্যাশবোর্ড (<span class="mono">/account</span>) — চারটি metric টাইল, profile, চলমান order ও শর্টকাট।</figcaption>
+</figure>
+
+<table class="data">
+  <tr><th style="width:24%">অংশ</th><th style="width:32%">কী দেখায়</th><th>কোথা থেকে আসে</th></tr>
+  <tr><td>Total orders</td><td>মোট order সংখ্যা</td><td><span class="mono">GET /orders/{userId}</span></td></tr>
+  <tr><td>Active orders</td><td>যেগুলো delivered বা cancelled নয়</td><td>একই তালিকা থেকে client-side filter</td></tr>
+  <tr><td>Wishlist items</td><td>সংখ্যা</td><td><span class="mono">GET /wishlist</span></td></tr>
+  <tr><td>Reward points</td><td>মোট পয়েন্ট</td><td><span class="mono">GET /users/{userId}/rewards</span></td></tr>
+  <tr><td>Profile</td><td>ইমেইল, ফোন, রোল</td><td>localStorage-এ রাখা session user object</td></tr>
+  <tr><td>Active orders তালিকা</td><td>সর্বোচ্চ ৫টি, প্রতিটিতে “Track” বোতাম</td><td>—</td></tr>
+  <tr><td>Shortcuts</td><td>Wishlist · Rewards · Cart</td><td>—</td></tr>
+</table>
+
+<div class="box warn">
+  <span class="boxTitle">যা নেই</span>
+  <p>Profile <strong>সম্পাদনা</strong> করার কোনো ব্যবস্থা নেই — নাম, ফোন বা পাসওয়ার্ড বদলানোর কোনো
+  UI বা API কোনোটিই নেই। পাসওয়ার্ড ভুলে গেলে পুনরুদ্ধারেরও উপায় নেই।
+  <span class="chip no">Not implemented</span></p>
+</div>
+
+<h2>25.1 ক্রেতার সম্পূর্ণ যাত্রা (screenshot সহ)</h2>
+<table class="data">
+  <tr><th class="c" style="width:6%">ধাপ</th><th style="width:26%">পেজ</th><th style="width:22%">কাজ</th><th>চিত্র</th></tr>
+  <tr><td class="c">1</td><td><span class="mono">/</span> বা <span class="mono">/marketplace</span></td><td>পণ্য খোঁজা ও filter</td><td>চিত্র 1, 16</td></tr>
+  <tr><td class="c">2</td><td><span class="mono">/marketplace/[id]</span></td><td>বিস্তারিত, trust, কৃষকের তথ্য</td><td>চিত্র 17</td></tr>
+  <tr><td class="c">3</td><td><span class="mono">/trace/[id]</span></td><td>উৎস যাচাই (ঐচ্ছিক)</td><td>চিত্র 19</td></tr>
+  <tr><td class="c">4</td><td><span class="mono">/auth/customer</span></td><td>login বা register</td><td>চিত্র 6</td></tr>
+  <tr><td class="c">5</td><td><span class="mono">/cart</span></td><td>পরিমাণ ঠিক করা</td><td>চিত্র 20</td></tr>
+  <tr><td class="c">6</td><td><span class="mono">/checkout</span></td><td>ঠিকানা ও payment (demo)</td><td>চিত্র 21</td></tr>
+  <tr><td class="c">7</td><td><span class="mono">/orders/[id]</span></td><td>status timeline দেখা</td><td>চিত্র 23</td></tr>
+  <tr><td class="c">8</td><td><span class="mono">/marketplace/[id]</span></td><td>DELIVERED হলে review দেওয়া</td><td>চিত্র 17</td></tr>
+  <tr><td class="c">9</td><td><span class="mono">/account</span></td><td>সারসংক্ষেপ</td><td>চিত্র 30</td></tr>
+</table>
+
+<figure class="wide">
+  <img src="shots/13-orders" alt="Order history">
+  <figcaption class="caption">চিত্র 31: Order history (<span class="mono">/orders</span>) — সংক্ষিপ্ত id, status badge, item সংখ্যা, মোট ও তারিখ।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch26"><span class="num">26</span>Admin Dashboard (Admin Console)<span class="mk">[[C26]]</span></h1>
+
+<p><span class="mono">/admin</span> স্বয়ংক্রিয়ভাবে <span class="mono">/admin/dashboard</span>-এ
+পাঠিয়ে দেয়। <span class="mono">app/admin/layout.js</span>-এ একটি বিশেষ ব্যবস্থা আছে:
+<span class="mono">/admin/login</span> পেজটি RoleGuard-এর <em>বাইরে</em> render হয় — নাহলে
+লগ-ইন না করা ব্যবহারকারীকে login পেজ থেকেই login পেজে পাঠানোর অসীম চক্র তৈরি হতো।</p>
+
+<h2>26.1 আটটি পেজ</h2>
+<table class="data tight">
+  <tr><th style="width:15%">পেজ</th><th style="width:26%">API</th><th style="width:30%">কী করা যায়</th><th>Audit হয়?</th></tr>
+  <tr><td>Overview</td><td><span class="mono">GET /admin/metrics</span></td><td>৬টি সংখ্যা দেখা</td><td>না (শুধু পড়া)</td></tr>
+  <tr><td>Verification</td><td><span class="mono">GET /admin/farmers/verifications</span><br>
+      <span class="mono">POST …/approve</span> · <span class="mono">…/reject</span></td>
+      <td>pending কৃষক approve/reject</td><td><strong>হ্যাঁ</strong></td></tr>
+  <tr><td>Farmers</td><td><span class="mono">GET /admin/farmers</span><br><span class="mono">PATCH /admin/farmers/{id}</span></td>
+      <td>সব কৃষক দেখা; account suspend/reinstate</td><td><strong>হ্যাঁ</strong></td></tr>
+  <tr><td>Products</td><td><span class="mono">GET /admin/products</span><br>
+      <span class="mono">PATCH/DELETE /products/{id}</span></td>
+      <td>search ও filter; যেকোনো পণ্য edit/archive/restore</td><td>archive-এ <strong>হ্যাঁ</strong></td></tr>
+  <tr><td>Customers</td><td><span class="mono">GET /admin/customers</span><br><span class="mono">PATCH /admin/customers/{id}</span></td>
+      <td>ক্রেতা তালিকা; suspend/reinstate</td><td><strong>হ্যাঁ</strong></td></tr>
+  <tr><td>Orders</td><td><span class="mono">GET /admin/orders</span><br><span class="mono">PATCH /orders/{id}/status</span></td>
+      <td>সব order; drop-down দিয়ে status বদল</td><td>না <span class="chip part">ফাঁক</span></td></tr>
+  <tr><td>Reviews</td><td><span class="mono">GET /admin/reviews</span><br><span class="mono">PATCH /admin/reviews/{id}</span></td>
+      <td>Hide / Republish</td><td><strong>হ্যাঁ</strong></td></tr>
+  <tr><td>Audit log</td><td><span class="mono">GET /admin/audit-log</span></td><td>সর্বশেষ ২০০টি কাজ দেখা</td><td>না (শুধু পড়া)</td></tr>
+</table>
+
+<h2>26.2 Overview metrics — কীভাবে গণনা হয়</h2>
+<pre>const [totalUsers, totalFarmers, pendingVerifications,
+       activeProducts, totalOrders, revenue] = await Promise.all([
+  prisma.user.count(),
+  prisma.user.count({ where: { role: "FARMER" } }),
+  prisma.farmerProfile.count({ where: { verificationStatus: "PENDING" } }),
+  prisma.product.count({ where: { status: "ACTIVE" } }),
+  prisma.order.count(),
+  prisma.order.aggregate({ _sum: { totalBdt: true }, where: { paymentStatus: "PAID" } })
+]);</pre>
+<p>ছয়টি query <span class="mono">Promise.all</span>-এ সমান্তরালে চলে, তাই মোট সময় সবচেয়ে ধীর
+query-টির সমান — একটির পর একটি চালালে ছয়গুণ সময় লাগত।</p>
+<p><strong>Revenue</strong> শুধু <span class="mono">paymentStatus = PAID</span> order-এর যোগফল।
+যেহেতু DEMO_CARD সাথে সাথে PAID হয়ে যায়, এটি বাস্তবে “demo কার্ডে দেওয়া order-এর মোট মূল্য” —
+প্রকৃত আয় নয়।</p>
+
+<figure class="wide">
+  <img src="shots/21-admin-dashboard" alt="Admin overview">
+  <figcaption class="caption">চিত্র 32: Admin overview — ৪ জন ব্যবহারকারী, ২ জন কৃষক, ১টি pending verification, ২টি active পণ্য, ১টি order, ১৮০ BDT “paid” মূল্য (ডকুমেন্ট তৈরির সময়ের প্রকৃত ডেটা)।</figcaption>
+</figure>
+
+<h2>26.3 Suspend করলে কী হয়?</h2>
+<p><span class="mono">User.status = SUSPENDED</span> হয়ে গেলে
+<span class="mono">POST /auth/login</span>-এ <span class="mono">401 "Invalid email or password"</span>
+ফেরত আসে। অর্থাৎ তিনি আর login করতে পারেন না।</p>
+<div class="box warn">
+  <span class="boxTitle">একটি গুরুত্বপূর্ণ সীমাবদ্ধতা</span>
+  <p>যদি ব্যবহারকারীর কাছে <em>ইতিমধ্যে</em> একটি বৈধ JWT থাকে, সেটি মেয়াদ (২ ঘণ্টা) শেষ না হওয়া
+  পর্যন্ত কাজ করতেই থাকবে — কারণ প্রতিটি request-এ ডাটাবেসে গিয়ে status দেখা হয় না। এটি stateless
+  JWT-র স্বাভাবিক বৈশিষ্ট্য। সমাধান হতো একটি token blacklist বা প্রতিটি request-এ status যাচাই।</p>
+</div>
+
+<figure class="wide">
+  <img src="shots/23-admin-farmers" alt="Admin farmers">
+  <figcaption class="caption">চিত্র 33: Admin → Farmers — verification status, পণ্যসংখ্যা, account status ও Suspend/Reinstate বোতাম।</figcaption>
+</figure>
+
+<figure class="wide">
+  <img src="shots/25-admin-customers" alt="Admin customers">
+  <figcaption class="caption">চিত্র 34: Admin → Customers — যোগদানের তারিখ, order সংখ্যা ও account নিয়ন্ত্রণ।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch27"><span class="num">27</span>Audit Log<span class="mk">[[C27]]</span></h1>
+
+<h2>27.1 কেন দরকার?</h2>
+<p>Admin-এর হাতে অনেক ক্ষমতা — কারও অ্যাকাউন্ট বন্ধ করা, কারও review লুকিয়ে ফেলা, কাউকে verified
+করা। এই ক্ষমতার সাথে <strong>জবাবদিহি</strong> থাকা দরকার। Audit log সেই জবাবদিহির খাতা: কে, কখন,
+কার উপর, কী করল — সব লেখা থাকে।</p>
+
+<h2>27.2 মডেল ও একটি অস্বাভাবিক সিদ্ধান্ত</h2>
+<pre>model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String   // কে করল (plain string, FK নয়)
+  actorRole  String
+  action     String   // যেমন "farmer_verification_approved"
+  targetType String   // "FarmerProfile" | "User" | "Review" | "Product"
+  targetId   String
+  metadata   String?  // JSON.stringify করা অতিরিক্ত তথ্য
+  createdAt  DateTime @default(now())
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}</pre>
+
+<div class="box info">
+  <span class="boxTitle">এখানে ইচ্ছাকৃতভাবে কোনো Foreign Key নেই — কেন?</span>
+  <p>কোডের কমেন্টেই উত্তরটি লেখা আছে: <em>“an audit record must survive even if the target row is
+  later deleted.”</em> যদি <span class="mono">actorId</span> একটি FK হতো, তাহলে সেই admin-এর অ্যাকাউন্ট
+  মুছে গেলে audit সারিটিও cascade-এ মুছে যেত বা লেখা যেত না। অর্থাৎ যে জিনিসটির পুরো উদ্দেশ্যই
+  “প্রমাণ রেখে দেওয়া”, সেটিই হারিয়ে যেত। তাই id গুলো নিছক string snapshot হিসেবে রাখা হয়েছে।</p>
+</div>
+
+<h2>27.3 কোন কোন কাজ রেকর্ড হয়</h2>
+<table class="data">
+  <tr><th style="width:30%">action</th><th style="width:16%">targetType</th><th style="width:22%">metadata</th><th>কোন route</th></tr>
+  <tr><td><span class="mono">farmer_verification_approved</span></td><td>FarmerProfile</td><td>—</td><td><span class="mono">admin/farmers/[id]/verification/approve</span></td></tr>
+  <tr><td><span class="mono">farmer_verification_rejected</span></td><td>FarmerProfile</td><td>—</td><td><span class="mono">…/verification/reject</span></td></tr>
+  <tr><td><span class="mono">farmer_status_updated</span></td><td>FarmerProfile</td><td><span class="mono">{ account_status }</span></td><td><span class="mono">PATCH admin/farmers/[id]</span></td></tr>
+  <tr><td><span class="mono">customer_status_updated</span></td><td>User</td><td><span class="mono">{ status }</span></td><td><span class="mono">PATCH admin/customers/[id]</span></td></tr>
+  <tr><td><span class="mono">review_moderated</span></td><td>Review</td><td><span class="mono">{ status }</span></td><td><span class="mono">PATCH admin/reviews/[id]</span></td></tr>
+  <tr><td><span class="mono">product_archived</span></td><td>Product</td>
+      <td><span class="mono">{ previousStatus, farmerId }</span></td><td><span class="mono">DELETE products/[id]</span></td></tr>
+</table>
+<p>শেষেরটি লক্ষণীয় — এটি শুধু admin নয়, <strong>কৃষক নিজে archive করলেও</strong> লেখা হয়, কারণ
+route-টি দুজনেরই সাধারণ। তাই <span class="mono">actorRole</span> ফিল্ডে <span class="mono">FARMER</span>
+বা <span class="mono">ADMIN</span> — যেটি প্রযোজ্য — লেখা থাকে।</p>
+
+<h2>27.4 দুটি সূক্ষ্ম কিন্তু গুরুত্বপূর্ণ নিয়ম</h2>
+<table class="data">
+  <tr><th style="width:34%">নিয়ম</th><th>কেন</th></tr>
+  <tr><td><strong>Audit লেখা কখনো request ব্যর্থ করে না</strong><br>
+      <span class="mono">recordAudit()</span>-এর ভিতরে পুরোটা <span class="mono">try/catch</span></td>
+      <td>audit টেবিলে সমস্যা হলে একজন কৃষকের verification আটকে যাওয়া উচিত নয়। মূল কাজ আগে,
+      লগ পরে।</td></tr>
+  <tr><td><strong>Audit লেখা হয় সফল হওয়ার পরে</strong></td>
+      <td>তাহলে যে কাজটি আসলে ঘটেনি (যেমন 403-এ আটকে গেছে) তার কোনো ভুয়া এন্ট্রি থাকবে না</td></tr>
+</table>
+
+<h2>27.5 কী দেখা যায়</h2>
+<p><span class="mono">GET /api/v1/admin/audit-log</span> — শুধু ADMIN, সর্বশেষ
+<span class="mono">take: 200</span>টি, <span class="mono">createdAt desc</span>। Response-এ
+<span class="mono">metadata</span> আবার <span class="mono">JSON.parse</span> করে object হিসেবে পাঠানো হয়।</p>
+
+<figure class="wide">
+  <img src="shots/28-admin-audit-log" alt="Admin audit log">
+  <figcaption class="caption">চিত্র 35: Audit log — ৫টি প্রকৃত এন্ট্রি (২টি review moderation, ২টি customer status পরিবর্তন, ১টি product archive), প্রতিটিতে actor, target ও সময়।</figcaption>
+</figure>
+
+<div class="box warn">
+  <span class="boxTitle">যেসব কাজ এখনো audit হয় না</span>
+  <p>Order status পরিবর্তন · পণ্য সম্পাদনা (PATCH) · পণ্য তৈরি · login (সফল বা ব্যর্থ) ·
+  ছবি আপলোড বা মুছে ফেলা · Farmer Card verification জমা দেওয়া (শুধু admin-এর সিদ্ধান্তটি লেখা হয়)।
+  এছাড়া তালিকায় pagination বা filter নেই — শুধু সর্বশেষ ২০০টি।</p>
+</div>
+
+
+<h1 class="chapter" id="ch28"><span class="num">28</span>Rate Limiting ও সামগ্রিক নিরাপত্তা<span class="mk">[[C28]]</span></h1>
+
+<h2>28.1 Rate limiting কী এবং কেন?</h2>
+<p>একই ব্যক্তি অল্প সময়ে অসংখ্যবার একই কাজ করার চেষ্টা করলে সেটি আটকে দেওয়া। উদ্দেশ্য —
+পাসওয়ার্ড অনুমান করার চেষ্টা (brute force), অসংখ্য ভুয়া অ্যাকাউন্ট তৈরি, আর storage ভরে ফেলা
+ঠেকানো।</p>
+
+<h2>28.2 বাস্তবায়ন — sliding window</h2>
+<pre>const buckets = new Map();              // key → timestamp[]
+
+function clientKey(request, scope) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+  return `${scope}:${ip}`;
+}
+
+export function enforceRateLimit(request, scope, { max = 10, windowMs = 60_000 } = {}) {
+  const now = Date.now();
+  const recent = (buckets.get(key) || []).filter(ts =&gt; now - ts &lt; windowMs);
+  if (recent.length &gt;= max) throw new ApiError("Too many requests — please try again shortly", 429);
+  recent.push(now);
+  buckets.set(key, recent);
+}</pre>
+<p>“Sliding window” মানে — শেষ ৬০ সেকেন্ডের ভিতরে পড়া timestamp গোনা হয়, ঘড়ির নির্দিষ্ট মিনিট নয়।
+ফলে মিনিট বদলের মুহূর্তে দ্বিগুণ request পাঠানোর ফাঁক থাকে না।</p>
+
+<h2>28.3 কোন কোন endpoint-এ, কত</h2>
+<table class="data">
+  <tr><th style="width:30%">Scope</th><th style="width:34%">Endpoint</th><th class="c" style="width:12%">সর্বোচ্চ</th><th class="c">সময়সীমা</th></tr>
+  <tr><td><span class="mono">auth-login</span></td><td><span class="mono">POST /api/v1/auth/login</span></td><td class="c">10</td><td class="c">60s</td></tr>
+  <tr><td><span class="mono">auth-register</span></td><td><span class="mono">POST /api/v1/auth/register</span></td><td class="c">6</td><td class="c">60s</td></tr>
+  <tr><td><span class="mono">farmer-verify</span></td><td><span class="mono">POST /api/v1/farmers/{id}/verify</span></td><td class="c">8</td><td class="c">60s</td></tr>
+  <tr><td><span class="mono">product-image-upload</span></td><td><span class="mono">POST /api/v1/uploads/product-image</span></td><td class="c">20</td><td class="c">60s</td></tr>
+  <tr><td><span class="mono">product-archive</span></td><td><span class="mono">DELETE /api/v1/products/{id}</span></td><td class="c">20</td><td class="c">60s</td></tr>
+</table>
+<p>সীমা ছাড়ালে <span class="mono">HTTP 429</span> এবং বার্তা
+<em>“Too many requests — please try again shortly”</em>।</p>
+
+<div class="box warn">
+  <span class="boxTitle">সৎ সীমাবদ্ধতা — কোডের কমেন্টেই স্বীকার করা আছে</span>
+  <p>এটি একটি <strong>in-memory</strong> ব্যবস্থা — গণনা server process-এর RAM-এ থাকে। Vercel-এর মতো
+  serverless পরিবেশে একাধিক instance চলতে পারে, এবং প্রতিটির নিজস্ব <span class="mono">Map</span>
+  থাকবে। তাই বাস্তব production-এ সীমাটি নিখুঁতভাবে কার্যকর নয়। সঠিক সমাধান হতো Redis-এর মতো একটি
+  ভাগাভাগি করা store। কোডে লেখা: <em>“a real multi-instance production deployment would need a
+  shared store (e.g. Redis) instead.”</em></p>
+</div>
+
+<h2>28.4 সম্পূর্ণ নিরাপত্তা-তালিকা — যা <span class="chip impl">বাস্তবায়িত</span></h2>
+<table class="data tight">
+  <tr><th style="width:24%">ব্যবস্থা</th><th style="width:34%">কীভাবে</th><th>ফাইল</th></tr>
+  <tr><td>পাসওয়ার্ড hashing</td><td>bcrypt, cost factor 10; plain text কোথাও রাখা হয় না</td><td><span class="mono">lib/server/auth.js</span></td></tr>
+  <tr><td>JWT signature</td><td>HS256, <span class="mono">JWT_SECRET</span> দিয়ে; মেয়াদ ২ ঘণ্টা</td><td>একই</td></tr>
+  <tr><td>Production-এ secret বাধ্যতামূলক</td><td><span class="mono">JWT_SECRET</span> না থাকলে app চালুই হয় না</td><td>একই</td></tr>
+  <tr><td>Role-based access</td><td><span class="mono">requireRole</span></td><td>একই</td></tr>
+  <tr><td>Ownership (IDOR) যাচাই</td><td><span class="mono">requireOwnerOrRole</span>, <span class="mono">assertOwnerOrAdmin</span></td><td>একই + route</td></tr>
+  <tr><td>Session থেকে পরিচয়</td><td>wishlist, farmer/orders, farmer/earnings — কোথাও client-এর id নেওয়া হয় না</td><td>সংশ্লিষ্ট route</td></tr>
+  <tr><td>Input validation</td><td>প্রতিটি write-route-এ Zod schema; ব্যর্থ হলে 422</td><td>সব route</td></tr>
+  <tr><td>SQL injection প্রতিরোধ</td><td>Prisma সবসময় parameterized query তৈরি করে; কাঁচা SQL শুধু <span class="mono">SELECT 1</span></td><td><span class="mono">app/ready/route.js</span></td></tr>
+  <tr><td>Identifier masking</td><td>NID ও Farmer Card কখনো পুরো পাঠানো হয় না — admin-কেও নয়</td><td><span class="mono">mask.js</span></td></tr>
+  <tr><td>CORS allow-list</td><td>ডিফল্ট same-origin; wildcard বা reflected Origin নেই</td><td><span class="mono">middleware.js</span></td></tr>
+  <tr><td>Upload MIME ও আকার যাচাই</td><td>তিনটি ফরম্যাট, ৩ MB; byte দুইবার গোনা হয়</td><td><span class="mono">imageValidation.js</span></td></tr>
+  <tr><td>SVG নিষিদ্ধ</td><td>XSS ঝুঁকির কারণে ইচ্ছাকৃতভাবে বাদ</td><td>একই</td></tr>
+  <tr><td>Path traversal প্রতিরোধ</td><td><span class="mono">isSafeStorageKey()</span> + প্রকৃত path resolve করে root-এর ভিতরে আছে কি না যাচাই</td><td><span class="mono">localDiskProvider.js</span></td></tr>
+  <tr><td>Download-এ <span class="mono">nosniff</span></td><td><span class="mono">X-Content-Type-Options: nosniff</span></td><td><span class="mono">uploads/[...key]/route.js</span></td></tr>
+  <tr><td>Rate limiting</td><td>৫টি endpoint-এ</td><td><span class="mono">rateLimit.js</span></td></tr>
+  <tr><td>Audit trail</td><td>৬ ধরনের কাজ</td><td><span class="mono">audit.js</span></td></tr>
+  <tr><td>Error message সমান রাখা</td><td>ভুল ইমেইল ও ভুল পাসওয়ার্ড — দুটোতেই একই বার্তা</td><td><span class="mono">auth/login/route.js</span></td></tr>
+  <tr><td>Internal error লুকানো</td><td><span class="mono">handleRoute()</span> অপ্রত্যাশিত ত্রুটিতে শুধু “Internal server error” পাঠায়, stack trace নয়</td><td><span class="mono">respond.js</span></td></tr>
+  <tr><td>Admin self-registration বন্ধ</td><td>register schema-তে <span class="mono">admin</span> নেই</td><td><span class="mono">auth/register/route.js</span></td></tr>
+  <tr><td>Database constraint</td><td>unique ও foreign key দিয়ে ডাটাবেস স্তরেই নিয়ম প্রয়োগ</td><td><span class="mono">schema.prisma</span></td></tr>
+</table>
+
+<h2>28.5 যা এখনো নেই <span class="chip no">Future</span></h2>
+<ul>
+  <li><strong>HttpOnly cookie</strong> — টোকেন <span class="mono">localStorage</span>-এ থাকায় XSS
+      হলে সেটি চুরি হতে পারে। HttpOnly cookie নিরাপদ হতো (তবে তখন CSRF ব্যবস্থা লাগত)।</li>
+  <li><strong>Refresh token</strong> — ২ ঘণ্টা পর আবার login করতে হয়।</li>
+  <li><strong>Token revocation</strong> — logout বা suspend করলেও পুরোনো token মেয়াদ শেষ না হওয়া পর্যন্ত বৈধ।</li>
+  <li><strong>শক্তিশালী পাসওয়ার্ড নীতি</strong> — শুধু ন্যূনতম ৬ অক্ষর।</li>
+  <li><strong>Email যাচাই ও পাসওয়ার্ড পুনরুদ্ধার</strong> — কোনোটিই নেই।</li>
+  <li><strong>2FA</strong>, <strong>CSP header</strong>, <strong>account lockout</strong> — নেই।</li>
+  <li><strong>বিতরণকৃত rate limiting</strong> — Redis ইত্যাদি নেই।</li>
+</ul>

@@ -1,0 +1,318 @@
+<!--PART:ভাগ গ — কৃষক মডিউল: যাচাই, কার্ড ও সুনাম-->
+<h1 class="chapter" id="ch10"><span class="num">10</span>Farmer Verification System<span class="mk">[[C10]]</span></h1>
+
+<div class="box ok">
+  <span class="boxTitle">এটি এই প্রজেক্টের সবচেয়ে গুরুত্বপূর্ণ অধ্যায়</span>
+  <p>ভাইভা বোর্ড সবচেয়ে বেশি প্রশ্ন এখান থেকেই করবেন, কারণ এটিই Fair Harvest-কে সাধারণ e-commerce
+  থেকে আলাদা করে। পুরো অধ্যায়টি ভালো করে পড়ুন।</p>
+</div>
+
+<h2>10.1 কেন farmer verification দরকার?</h2>
+<p>যদি যে কেউ “আমি কৃষক” বলে register করেই পণ্য বিক্রি শুরু করতে পারে, তাহলে প্ল্যাটফর্মের মূল
+প্রতিশ্রুতি — <em>“verified কৃষকের কাছ থেকে কিনছেন”</em> — অর্থহীন হয়ে যায়। তাই Fair Harvest-এ একটি
+নিয়ম শক্তভাবে বসানো আছে:</p>
+<div class="box warn">
+  <p style="text-align:center;font-weight:700;font-size:11pt">verificationStatus === "VERIFIED" না হলে<br>
+  <span class="mono">POST /api/v1/products</span> কখনোই সফল হবে না — <span class="mono">403</span>।</p>
+</div>
+
+<h2>10.2 verificationStatus-এর তিনটি অবস্থা</h2>
+<table class="data">
+  <tr><th style="width:16%">অবস্থা</th><th style="width:30%">অর্থ</th><th style="width:27%">কীভাবে এখানে আসে</th><th>কৃষক কী করতে পারেন</th></tr>
+  <tr><td><span class="mono">PENDING</span></td><td>এখনো যাচাই হয়নি (ডিফল্ট)</td>
+      <td>farmer হিসেবে register করলেই · অথবা card-এর তথ্য না মিললে</td>
+      <td>login, dashboard দেখা, verification জমা দেওয়া। <strong>পণ্য যোগ করা যায় না, ছবি upload করা যায় না</strong></td></tr>
+  <tr><td><span class="mono">VERIFIED</span></td><td>যাচাই সম্পন্ন</td>
+      <td>card+NID+নাম মিললে তাৎক্ষণিক · অথবা admin approve করলে</td>
+      <td>পণ্য যোগ/সম্পাদনা/archive, ছবি upload, trace event, order status বদল</td></tr>
+  <tr><td><span class="mono">REJECTED</span></td><td>admin আবেদন নাকচ করেছেন</td>
+      <td>শুধুই <span class="mono">POST /admin/farmers/{id}/verification/reject</span> দিয়ে</td>
+      <td>PENDING-এর মতোই সীমিত; reputation-এর verification score ৩০-এ নেমে যায়</td></tr>
+</table>
+
+<h2>10.3 সম্পূর্ণ প্রবাহ (ধাপে ধাপে)</h2>
+<figure class="wide">
+  <img src="diagrams/d4-verification.svg" alt="Farmer verification flow">
+  <figcaption class="caption">চিত্র 7: Registration থেকে VERIFIED হওয়া পর্যন্ত সম্পূর্ণ verification প্রবাহ, দুটি পথ সহ।</figcaption>
+</figure>
+
+<ol>
+  <li><strong>Registration</strong> — <span class="mono">/auth/farmer</span>-এ “Create account”।
+      <span class="mono">POST /auth/register</span> একই লেনদেনে <span class="mono">User</span> ও একটি খালি
+      <span class="mono">FarmerProfile</span> তৈরি করে। ডিফল্ট <span class="mono">verificationStatus = PENDING</span>,
+      <span class="mono">reputationScore = 70</span>, <span class="mono">badge = "New Farmer"</span>।</li>
+  <li><strong>Dashboard-এ সতর্কবার্তা</strong> — <span class="mono">/farmer/dashboard</span>-এ
+      “Verification required — Product listing is locked until your Government Farmer Card is verified”
+      লেখা একটি প্যানেল দেখায়, এবং “Add product” ফর্মটি একেবারেই render হয় না।</li>
+  <li><strong>ফর্ম পূরণ</strong> — <span class="mono">/farmer/verify</span>-তে তিনটি ঘর: Full name (as on card),
+      Farmer Card number, NID number।</li>
+  <li><strong>API কল</strong> — <span class="mono">POST /api/v1/farmers/{farmerId}/verify</span>।
+      প্রথমে rate limit (৮/মিনিট), তারপর <span class="mono">requireOwnerOrRole(request, profile.userId, ["ADMIN"])</span>
+      — অর্থাৎ একজন কৃষক অন্যজনের হয়ে আবেদন করতে পারেন না। তারপর Zod validation।</li>
+  <li><strong>Provider যাচাই</strong> — <span class="mono">verifyFarmerCard()</span> ডাকা হয়
+      (বিস্তারিত অধ্যায় 11)।</li>
+  <li><strong>ডাটাবেস আপডেট</strong> — ফলাফল যাই হোক, জমা দেওয়া card ও NID সংরক্ষিত হয়:
+      <pre>verificationStatus: result.matched ? "VERIFIED" : "PENDING",
+verificationMethod: result.matched
+    ? (result.provider === "official" ? "OFFICIAL_API" : "DEMO_REGISTRY")
+    : "MANUAL",
+verifiedAt: result.matched ? new Date() : null</pre></li>
+  <li><strong>Reputation পুনর্গণনা</strong> — <span class="mono">recomputeFarmerReputation(farmerId)</span>
+      সাথে সাথে চলে, কারণ verification reputation-এর একটি উপাদান।</li>
+  <li><strong>Session সতেজ করা</strong> — frontend তারপর <span class="mono">getMe()</span> ডেকে
+      localStorage-এর user object নতুন করে লেখে, যাতে dashboard সাথে সাথে unlock হয়।</li>
+</ol>
+
+<figure class="wide">
+  <img src="shots/19-farmer-verify" alt="Farmer Card verification page">
+  <figcaption class="caption">চিত্র 8: <span class="mono">/farmer/verify</span> — Farmer Card verification ফর্ম (pending কৃষক Karim Sheikh হিসেবে লগ-ইন করা)।</figcaption>
+</figure>
+
+<h2>10.4 Admin-এর manual review পথ</h2>
+<p>স্বয়ংক্রিয় যাচাই ব্যর্থ হলে profile <span class="mono">PENDING</span> থাকে এবং সে
+<span class="mono">GET /api/v1/admin/farmers/verifications</span>-এর তালিকায় চলে আসে
+(<span class="mono">createdAt</span> অনুসারে পুরোনো আগে — অর্থাৎ FIFO queue)।</p>
+
+<table class="data">
+  <tr><th style="width:12%">সিদ্ধান্ত</th><th style="width:38%">Endpoint</th><th>ডাটাবেসে কী লেখা হয়</th></tr>
+  <tr><td><strong>Approve</strong></td><td><span class="mono">POST /api/v1/admin/farmers/{farmerId}/verification/approve</span></td>
+      <td><span class="mono">VERIFIED</span> · <span class="mono">method = MANUAL</span> ·
+      <span class="mono">verifiedAt = now()</span> · <span class="mono">verifiedByAdminId = session.userId</span>
+      · audit action <span class="mono">farmer_verification_approved</span></td></tr>
+  <tr><td><strong>Reject</strong></td><td><span class="mono">POST /api/v1/admin/farmers/{farmerId}/verification/reject</span></td>
+      <td><span class="mono">REJECTED</span> · <span class="mono">method = MANUAL</span> ·
+      <span class="mono">verifiedAt = null</span> · <span class="mono">verifiedByAdminId</span> সংরক্ষিত
+      · audit action <span class="mono">farmer_verification_rejected</span></td></tr>
+</table>
+
+<p><span class="mono">verifiedByAdminId</span> একটি self-relation — <span class="mono">User</span> মডেলে
+<span class="mono">verifiedFarmers FarmerProfile[] @relation("VerifiedByAdmin")</span> হিসেবে ফিরে আসে।
+অর্থাৎ ডাটাবেসেই লেখা থাকে <em>কোন admin কোন কৃষককে verify করেছেন</em>।</p>
+
+<figure class="wide">
+  <img src="shots/22-admin-verification" alt="Admin verification queue">
+  <figcaption class="caption">চিত্র 9: Admin verification queue — Karim Sheikh এখনো pending; Farmer Card নম্বর <strong>masked</strong> অবস্থায় (<span class="mono">********9999</span>) দেখানো হচ্ছে।</figcaption>
+</figure>
+
+<h2>10.5 API সারাংশ</h2>
+<table class="data tight">
+  <tr><th>Method</th><th>Endpoint</th><th>কে ডাকতে পারে</th><th>কাজ</th></tr>
+  <tr><td>POST</td><td><span class="mono">/api/v1/farmers/{farmerId}/verify</span></td><td>মালিক কৃষক বা ADMIN</td><td>Card জমা দিয়ে যাচাই করা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/api/v1/farmers/{farmerId}/verification-status</span></td><td>মালিক কৃষক বা ADMIN</td><td>নিজের অবস্থা দেখা</td></tr>
+  <tr><td>GET</td><td><span class="mono">/api/v1/admin/farmers/verifications</span></td><td>ADMIN</td><td>pending তালিকা</td></tr>
+  <tr><td>POST</td><td><span class="mono">/api/v1/admin/farmers/{farmerId}/verification/approve</span></td><td>ADMIN</td><td>অনুমোদন</td></tr>
+  <tr><td>POST</td><td><span class="mono">/api/v1/admin/farmers/{farmerId}/verification/reject</span></td><td>ADMIN</td><td>নাকচ</td></tr>
+</table>
+
+<div class="box warn">
+  <span class="boxTitle">সীমাবদ্ধতা যা ভাইভায় নিজে থেকেই বলা ভালো</span>
+  <p>(১) কোনো ডকুমেন্ট/ছবি আপলোড করে যাচাইয়ের ব্যবস্থা নেই — শুধু সংখ্যা ও নাম মেলানো হয়।
+  (২) REJECTED হয়ে যাওয়ার পর কৃষক আবার আবেদন করলে status আবার PENDING হয়ে যায়; কতবার চেষ্টা করা
+  যাবে তার কোনো সীমা নেই (শুধু rate limit আছে)। (৩) নাকচের কারণ (reason) সংরক্ষণ করা হয় না।</p>
+</div>
+
+
+<h1 class="chapter" id="ch11"><span class="num">11</span>Government Farmer Card System<span class="mk">[[C11]]</span></h1>
+
+<div class="box bad">
+  <span class="boxTitle">সবার আগে সবচেয়ে জরুরি সত্যটি</span>
+  <p><strong>এই প্রজেক্টে বাংলাদেশ সরকারের কোনো প্রকৃত API-র সাথে সংযোগ নেই।</strong> যাচাই হয়
+  প্রজেক্টের নিজের ডাটাবেসের <span class="mono">GovFarmerCardRecord</span> টেবিলের বিপরীতে, যেখানে
+  seed ফাইল দিয়ে ৮টি নমুনা কার্ড ঢোকানো হয়েছে। এটি একটি <strong>simulated / demo registry</strong>।
+  বোর্ড এই প্রশ্নটি করবেনই — সরাসরি স্বীকার করে নিলে সেটি দুর্বলতা নয়, সততা হিসেবে গণ্য হয়।</p>
+</div>
+
+<h2>11.1 Farmer Card কী এবং কেন?</h2>
+<p>বাংলাদেশে কৃষকদের জন্য সরকারি “কৃষি উপকরণ সহায়তা কার্ড” বা Farmer Card থাকে, যেখানে কৃষকের নাম,
+NID, জেলা ইত্যাদি লেখা থাকে। Fair Harvest এই ধারণাটিকে <em>ডিজিটাল পরিচয় যাচাইয়ের ভিত্তি</em> হিসেবে
+ব্যবহার করে — কারণ এটি এমন একটি নথি যা শুধু প্রকৃত কৃষকেরই থাকে।</p>
+
+<h2>11.2 GovFarmerCardRecord মডেল</h2>
+<pre>model GovFarmerCardRecord {
+  id         String        @id @default(cuid())
+  cardNumber String        @unique      // BD-FARM-0001
+  nidNumber  String
+  fullName   String
+  district   String
+  issueDate  DateTime
+  status     GovCardStatus @default(ACTIVE)   // ACTIVE | REVOKED
+  cropTypes  String?
+}</pre>
+<p><strong>খেয়াল করুন:</strong> এই টেবিলের সাথে <span class="mono">FarmerProfile</span>-এর কোনো
+foreign key নেই। এটি ইচ্ছাকৃত — বাস্তব জীবনে সরকারি রেজিস্ট্রি একটি <em>বাইরের ব্যবস্থা</em>,
+আমাদের ডাটাবেসের অংশ নয়। তাই এখানেও এটিকে শুধু <strong>lookup table</strong> হিসেবে রাখা হয়েছে,
+যাতে ভবিষ্যতে এটিকে সত্যিকারের API দিয়ে প্রতিস্থাপন করা যায়।</p>
+
+<h2>11.3 Seed করা ৮টি ডেমো কার্ড</h2>
+<table class="data tight">
+  <tr><th>Card number</th><th>NID</th><th>নাম</th><th>জেলা</th><th>Issue date</th><th>Status</th></tr>
+  <tr><td><span class="mono">BD-FARM-0001</span></td><td>1990123456789</td><td>Rahim Uddin</td><td>Dhaka</td><td>2022-03-14</td><td><span class="chip impl">ACTIVE</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0002</span></td><td>1988987654321</td><td>Amina Khatun</td><td>Rangpur</td><td>2021-07-02</td><td><span class="chip impl">ACTIVE</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0003</span></td><td>1985456789123</td><td>Salim Mia</td><td>Bogura</td><td>2020-11-20</td><td><span class="chip impl">ACTIVE</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0004</span></td><td>1993321654987</td><td>Nasrin Begum</td><td>Khulna</td><td>2023-01-09</td><td><span class="chip impl">ACTIVE</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0005</span></td><td>1979112233445</td><td>Habibur Rahman</td><td>Sylhet</td><td>2019-05-30</td><td><span class="chip no">REVOKED</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0006</span></td><td>1996556677889</td><td>Jasmine Akter</td><td>Chattogram</td><td>2024-02-18</td><td><span class="chip impl">ACTIVE</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0007</span></td><td>1982998877665</td><td>Kamal Hossain</td><td>Rajshahi</td><td>2018-09-11</td><td><span class="chip impl">ACTIVE</span></td></tr>
+  <tr><td><span class="mono">BD-FARM-0008</span></td><td>1991443322110</td><td>Ruma Aktar</td><td>Barishal</td><td>2022-12-01</td><td><span class="chip impl">ACTIVE</span></td></tr>
+</table>
+<p>একটি <span class="mono">REVOKED</span> কার্ড ইচ্ছাকৃতভাবে রাখা হয়েছে, যাতে ডেমোতে “বাতিল কার্ড”
+কেসটিও দেখানো যায়।</p>
+
+<h2>11.4 যাচাইয়ের সিদ্ধান্ত-বৃক্ষ</h2>
+<figure class="wide">
+  <img src="diagrams/d5-card.svg" alt="Farmer Card decision tree">
+  <figcaption class="caption">চিত্র 10: <span class="mono">demoRegistryProvider.js</span>-এর সিদ্ধান্ত — কোন অবস্থায় কী ফলাফল।</figcaption>
+</figure>
+
+<p>নাম মেলানোর সময় ছোট-বড় হরফ ও বাড়তি স্পেস উপেক্ষা করা হয়:</p>
+<pre>function normalizeName(value) {
+  return (value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}</pre>
+<p>অর্থাৎ <span class="mono">"  rahim   UDDIN "</span> আর <span class="mono">"Rahim Uddin"</span> একই
+ধরা হয়। তবে বানান ভুল হলে মিলবে না — কোনো fuzzy matching নেই।</p>
+
+<h2>11.5 দুটি provider — একটাই interface</h2>
+<table class="data">
+  <tr><th style="width:24%">Provider</th><th style="width:16%">কখন চলে</th><th>কী করে</th></tr>
+  <tr><td><span class="mono">demoRegistryProvider.js</span></td>
+      <td><span class="mono">VERIFICATION_PROVIDER</span> ≠ <span class="mono">"official"</span> (ডিফল্ট)</td>
+      <td>নিজের ডাটাবেসের <span class="mono">GovFarmerCardRecord</span> টেবিলে খোঁজে
+      <span class="chip demo">DEMO</span></td></tr>
+  <tr><td><span class="mono">officialGovApiProvider.js</span></td>
+      <td><span class="mono">VERIFICATION_PROVIDER = "official"</span></td>
+      <td><span class="mono">POST {GOV_API_BASE_URL}/farmer-cards/{card}/verify</span>-এ কল করে।
+      কোডটি লেখা আছে কিন্তু <strong>কোনো প্রকৃত endpoint নেই</strong>; URL সেট না থাকলে
+      <span class="mono">official_provider_not_configured</span> ফেরত দেয়
+      <span class="chip no">stub — বাস্তবে ব্যবহৃত নয়</span></td></tr>
+</table>
+
+<p>দুটি provider হুবহু একই আকারের object ফেরত দেয়:</p>
+<pre>{ matched: boolean, confidence: number, record: {…} | null, reason: string }</pre>
+<p>এই কারণেই <span class="mono">index.js</span> শুধু একটিকে বেছে নেয়, আর route handler কখনো জানেই না
+কোনটি চলল। ভবিষ্যতে সরকারি API পাওয়া গেলে <strong>শুধু একটি ফাইলে</strong> আসল URL ও credential
+বসালেই হবে।</p>
+
+<h2>11.6 কৃষক ও admin কে কী দেখেন?</h2>
+<table class="data">
+  <tr><th style="width:18%">কে</th><th style="width:40%">কী দেখেন</th><th>কোথায়</th></tr>
+  <tr><td>কৃষক (সফল)</td><td>সবুজ badge “Verified instantly”, নিজের নাম ও জেলা, dashboard-এ যাওয়ার বোতাম</td>
+      <td><span class="mono">/farmer/verify</span></td></tr>
+  <tr><td>কৃষক (ব্যর্থ)</td><td>হলুদ badge “Pending manual review” এবং ব্যাখ্যা যে admin দেখবেন</td>
+      <td>একই পেজ</td></tr>
+  <tr><td>Admin</td><td>নাম, ইমেইল, <strong>masked</strong> card নম্বর, জেলা, status, Approve/Reject বোতাম</td>
+      <td><span class="mono">/admin/verification</span></td></tr>
+  <tr><td>যে কেউ (public)</td><td>কৃষকের public profile-এ masked card নম্বর ও verified badge</td>
+      <td><span class="mono">/farmers/[farmerId]</span></td></tr>
+</table>
+
+<div class="box ok">
+  <span class="boxTitle">Masking — একটি ছোট কিন্তু ভালো সিদ্ধান্ত</span>
+  <p><span class="mono">lib/server/mask.js</span>-এর <span class="mono">maskIdentifier()</span> শেষ ৪টি
+  অক্ষর ছাড়া বাকি সব <span class="mono">*</span> করে দেয়। এটি <em>admin-কেও</em> প্রযোজ্য —
+  <span class="mono">toAdminFarmer()</span> serializer কখনো পুরো NID বা card নম্বর পাঠায় না।
+  অর্থাৎ API response কখনোই পূর্ণ সংবেদনশীল পরিচয় বহন করে না। এর জন্য ৪টি আলাদা unit test আছে।</p>
+  <pre>maskIdentifier("BD-FARM-0001")  →  "********0001"</pre>
+</div>
+
+
+<h1 class="chapter" id="ch12"><span class="num">12</span>Farmer Reputation / Trust Score<span class="mk">[[C12]]</span></h1>
+
+<h2>12.1 কেন reputation দরকার?</h2>
+<p>Verification শুধু বলে “এই লোক সত্যিই কৃষক”। কিন্তু সে <em>ভালো</em> কৃষক কি না — সময়মতো পণ্য
+পৌঁছায় কি না, ক্রেতারা সন্তুষ্ট কি না — সেটি বলে না। reputation score সেই ফাঁকটি পূরণ করে।</p>
+
+<h2>12.2 সূত্র (আসল কোড থেকে)</h2>
+<figure class="wide">
+  <img src="diagrams/d11-reputation.svg" alt="Reputation formula">
+  <figcaption class="caption">চিত্র 11: তিনটি সংকেত থেকে reputation score ও badge গণনার প্রক্রিয়া।</figcaption>
+</figure>
+
+<pre>// lib/server/reputation.js
+const verificationScore =
+  verificationStatus === "VERIFIED" ? 90 : verificationStatus === "PENDING" ? 60 : 30;
+
+const reviewScore   = reviewCount    &gt; 0 ? clamp((avgRating / 5) * 100)          : 70;
+const deliveryScore = totalOrderItems &gt; 0 ? clamp((deliveredCount / totalOrderItems) * 100) : 75;
+
+const overallScore = clamp(
+    verificationScore * 0.35
+  + reviewScore       * 0.40
+  + deliveryScore     * 0.25
+);</pre>
+
+<p style="text-align:center;font-size:11.5pt;margin:10px 0">
+<strong>Score = clamp( 0.35 × S<sub>verification</sub> + 0.40 × S<sub>review</sub> + 0.25 × S<sub>delivery</sub> )</strong></p>
+
+<table class="data">
+  <tr><th style="width:22%">উপাদান</th><th class="c" style="width:10%">ওজন</th><th style="width:30%">কীভাবে গণনা হয়</th><th>ইতিহাস না থাকলে</th></tr>
+  <tr><td>Verification score</td><td class="c">35%</td><td>VERIFIED → 90 · PENDING → 60 · REJECTED → 30</td><td>প্রযোজ্য নয় (সবসময় একটি status থাকে)</td></tr>
+  <tr><td>Review score</td><td class="c">40%</td><td>(গড় rating ÷ 5) × 100 — শুধু PUBLISHED review গোনা হয়</td><td><strong>70</strong> (নিরপেক্ষ ভিত্তি, 0 নয়)</td></tr>
+  <tr><td>Delivery score</td><td class="c">25%</td><td>(DELIVERED order item ÷ মোট order item) × 100</td><td><strong>75</strong> (নিরপেক্ষ ভিত্তি)</td></tr>
+</table>
+
+<div class="box info">
+  <span class="boxTitle">কেন ইতিহাস না থাকলে 0 নয়, 70/75?</span>
+  <p>কারণ একজন নতুন verified কৃষককে শাস্তি দেওয়া অন্যায় হতো। তার তো এখনো কোনো review বা order-ই
+  নেই। কোডের কমেন্টেই লেখা আছে: <em>“so a brand-new verified farmer isn't penalized for having no
+  history yet.”</em> এটি একটি সচেতন ডিজাইন সিদ্ধান্ত — ভাইভায় এটি বললে ভালো প্রভাব পড়বে।</p>
+</div>
+
+<h2>12.3 বাস্তব উদাহরণ — Rahim Uddin (চালু সিস্টেম থেকে যাচাইকৃত)</h2>
+<p>নিচের সংখ্যাগুলো এই ডকুমেন্ট তৈরির সময় চালু অ্যাপ থেকে
+<span class="mono">GET /api/v1/farmers/seed-farmer-rahim/score</span> ডেকে পাওয়া।</p>
+
+<table class="data">
+  <tr><th style="width:30%">সংকেত</th><th style="width:28%">বাস্তব অবস্থা</th><th class="c" style="width:14%">Score</th><th class="c">× ওজন</th></tr>
+  <tr><td>Verification</td><td>VERIFIED</td><td class="c">90</td><td class="c">90 × 0.35 = 31.5</td></tr>
+  <tr><td>Review</td><td>১টি review, rating ৫/৫</td><td class="c">100</td><td class="c">100 × 0.40 = 40.0</td></tr>
+  <tr><td>Delivery</td><td>১টি order item, সেটি DELIVERED</td><td class="c">100</td><td class="c">100 × 0.25 = 25.0</td></tr>
+  <tr><td colspan="3" style="text-align:right"><strong>যোগফল = 96.5 → Math.round →</strong></td><td class="c"><strong>97</strong></td></tr>
+  <tr><td colspan="3" style="text-align:right"><strong>badgeForScore(97) →</strong></td><td class="c"><strong>Trusted Seller</strong></td></tr>
+</table>
+
+<pre>{"farmer_id":"seed-farmer-rahim","reputation_score":97,"badge":"Trusted Seller",
+ "verification_status":"verified","review_count":1,"average_rating":5,
+ "breakdown":{"quality_score":100,"delivery_score":100,"review_score":100,"cert_score":90}}</pre>
+
+<h2>12.4 Badge-এর ধাপ</h2>
+<table class="data">
+  <tr><th class="c">Score</th><th>Badge</th><th class="c">Score</th><th>Badge</th></tr>
+  <tr><td class="c">≥ 90</td><td><strong>Trusted Seller</strong></td><td class="c">≥ 55</td><td>Growing Farmer</td></tr>
+  <tr><td class="c">≥ 75</td><td>Reliable Farmer</td><td class="c">&lt; 55</td><td>New Farmer</td></tr>
+</table>
+
+<h2>12.5 কখন পুনরায় গণনা হয়?</h2>
+<p><span class="mono">recomputeFarmerReputation()</span> চারটি ঘটনার পরে ডাকা হয় এবং ফলাফল
+<span class="mono">FarmerProfile</span>-এ <strong>লিখে</strong> রাখা হয়:</p>
+<table class="data">
+  <tr><th style="width:34%">ঘটনা</th><th>ফাইল</th></tr>
+  <tr><td>নতুন review জমা পড়ল</td><td><span class="mono">app/api/v1/reviews/route.js</span></td></tr>
+  <tr><td>Farmer Card verification জমা পড়ল</td><td><span class="mono">app/api/v1/farmers/[farmerId]/verify/route.js</span></td></tr>
+  <tr><td>Order DELIVERED বা CANCELLED হলো</td><td><span class="mono">app/api/v1/orders/[id]/status/route.js</span></td></tr>
+  <tr><td>Admin কোনো review hide/republish করল</td><td><span class="mono">app/api/v1/admin/reviews/[reviewId]/route.js</span></td></tr>
+</table>
+
+<p>আর <span class="mono">GET /api/v1/farmers/{id}/score</span> ডাকলে
+<span class="mono">getFarmerReputationBreakdown()</span> ব্যবহার হয় — এটি <em>কিছু লেখে না</em>, শুধু
+বর্তমান মান হিসাব করে ফেরত দেয়। GET request-এ ডাটাবেস লেখা উচিত নয় বলেই এই দুটি আলাদা রাখা হয়েছে।</p>
+
+<h2>12.6 trust_score বনাম reputation_score — গুলিয়ে ফেলবেন না</h2>
+<div class="box warn">
+  <span class="boxTitle">দুটি আলাদা জিনিস</span>
+  <table class="data" style="margin-top:6px">
+    <tr><th style="width:26%">ফিল্ড</th><th style="width:20%">কার উপর</th><th>কীভাবে নির্ধারিত হয়</th></tr>
+    <tr><td><span class="mono">FarmerProfile.reputationScore</span></td><td>কৃষকের উপর</td>
+        <td><strong>স্বয়ংক্রিয়ভাবে গণনা করা</strong> — উপরের সূত্র অনুযায়ী <span class="chip impl">সত্যিকারের</span></td></tr>
+    <tr><td><span class="mono">Product.trustScore</span></td><td>পণ্যের উপর</td>
+        <td>ডিফল্ট <strong>80</strong>; seed ডেটায় হাতে বসানো (spinach 91, tomato 86)। কোনো API এটি
+        স্বয়ংক্রিয়ভাবে পরিবর্তন করে না। <span class="chip part">আংশিক — মূলত স্থির মান</span></td></tr>
+  </table>
+  <p style="margin-top:6px">বোর্ড যদি marketplace কার্ডের “91%” দেখে জিজ্ঞেস করেন “এটা কোথা থেকে এলো?” —
+  সৎ উত্তর: “ওটি <span class="mono">Product.trustScore</span>, যা এখনো স্বয়ংক্রিয় নয়; কৃষকের
+  reputation-ই কেবল সত্যিকারের গণনা করা মান।”</p>
+</div>
+
+<figure class="wide">
+  <img src="shots/05-farmer-public-profile" alt="Public farmer profile">
+  <figcaption class="caption">চিত্র 12: কৃষকের public profile (<span class="mono">/farmers/seed-farmer-rahim</span>) — reputation 97, badge, গড় rating ও masked Farmer Card নম্বর।</figcaption>
+</figure>

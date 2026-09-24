@@ -1,0 +1,341 @@
+<!--PART:ভাগ ঝ — গুণমান, ডেপ্লয়মেন্ট ও সীমাবদ্ধতা-->
+<h1 class="chapter" id="ch37"><span class="num">37</span>Error Handling<span class="mk">[[C37]]</span></h1>
+
+<h2>37.1 কেন্দ্রীয় ব্যবস্থা</h2>
+<p>প্রতিটি route handler-এর ভিতরের কোড <span class="mono">handleRoute()</span>-এ মোড়ানো। ফলে
+কোথাও <span class="mono">try/catch</span> লিখতে হয় না, আর ত্রুটির উত্তরের আকারও সব জায়গায় এক।</p>
+<pre>export class ApiError extends Error {
+  constructor(message, status = 400) { super(message); this.status = status; }
+}
+
+export async function handleRoute(fn) {
+  try { return await fn(); }
+  catch (error) {
+    if (error instanceof ApiError) return fail(error.message, { status: error.status });
+    console.error(error);                                   // সার্ভারের লগে বিস্তারিত
+    return fail("Internal server error", { status: 500 });  // ক্লায়েন্টকে শুধু এইটুকু
+  }
+}</pre>
+<div class="box ok">
+  <span class="boxTitle">এখানে একটি নিরাপত্তা সিদ্ধান্ত লুকানো আছে</span>
+  <p>অপ্রত্যাশিত ত্রুটির বিস্তারিত (stack trace, SQL, ফাইলের পথ) কখনো ব্রাউজারে পাঠানো হয় না।
+  সেগুলো শুধু server log-এ যায়। নাহলে আক্রমণকারী ত্রুটির বার্তা থেকে ডাটাবেসের গঠন বুঝে ফেলতে পারত।</p>
+</div>
+
+<h2>37.2 HTTP status কোডের ব্যবহার</h2>
+<table class="data tight">
+  <tr><th class="c" style="width:8%">Code</th><th style="width:22%">অর্থ</th><th style="width:34%">কখন হয়</th><th>উদাহরণ বার্তা</th></tr>
+  <tr><td class="c"><strong>200</strong></td><td>সফল</td><td>পড়া বা আপডেট</td><td>“OK”, “Product updated”</td></tr>
+  <tr><td class="c"><strong>201</strong></td><td>তৈরি হয়েছে</td><td>register, product, review, order, cart item, trace event</td><td>“Order placed”</td></tr>
+  <tr><td class="c"><strong>400</strong></td><td>অনুরোধ ভুল</td><td>খালি cart নিয়ে checkout</td><td>“Your cart is empty”</td></tr>
+  <tr><td class="c"><strong>401</strong></td><td>পরিচয় নেই/ভুল</td><td>টোকেন নেই, মেয়াদোত্তীর্ণ, ভুল পাসওয়ার্ড, suspended</td><td>“Authentication required”, “Invalid email or password”</td></tr>
+  <tr><td class="c"><strong>403</strong></td><td>অনুমতি নেই</td><td>অন্যের জিনিস, ভুল রোল, unverified কৃষক, না-কিনে review</td><td>“Only verified farmers can list products”</td></tr>
+  <tr><td class="c"><strong>404</strong></td><td>পাওয়া যায়নি</td><td>ভুল id; অথবা ইচ্ছাকৃতভাবে অন্যের cart item</td><td>“Product not found”, “Cart item not found”</td></tr>
+  <tr><td class="c"><strong>409</strong></td><td>দ্বন্দ্ব</td><td>ইমেইল আগে থেকেই আছে; stock যথেষ্ট নয়</td><td>“Not enough stock for Organic Spinach”</td></tr>
+  <tr><td class="c"><strong>422</strong></td><td>ইনপুট অবৈধ</td><td>প্রতিটি Zod ব্যর্থতা</td><td>“Rating must be 1-5”, “Enter a valid email”</td></tr>
+  <tr><td class="c"><strong>429</strong></td><td>অতিরিক্ত অনুরোধ</td><td>rate limit</td><td>“Too many requests — please try again shortly”</td></tr>
+  <tr><td class="c"><strong>500</strong></td><td>সার্ভার ত্রুটি</td><td>অপ্রত্যাশিত কিছু</td><td>“Internal server error”</td></tr>
+  <tr><td class="c"><strong>503</strong></td><td>প্রস্তুত নয়</td><td><span class="mono">/ready</span>-তে ডাটাবেস অনুপলব্ধ</td><td>“Database unavailable”</td></tr>
+</table>
+
+<h2>37.3 ৪০৪ বনাম ৪০৩ — একটি সূক্ষ্ম সিদ্ধান্ত</h2>
+<p>অন্যের cart item ধরতে চাইলে <span class="mono">403</span> না দিয়ে <span class="mono">404</span> দেওয়া হয়:</p>
+<pre>if (!item || item.cart.userId !== userId) throw new ApiError("Cart item not found", 404);</pre>
+<p>কারণ 403 বললে আক্রমণকারী বুঝে যেত “এই id-টি সত্যিই আছে, শুধু আমার নয়” — অর্থাৎ অস্তিত্ব ফাঁস হতো।
+404 দিলে সে কিছুই জানতে পারে না।</p>
+
+<h2>37.4 Frontend-এ ত্রুটি সামলানো</h2>
+<table class="data">
+  <tr><th style="width:26%">কৌশল</th><th style="width:26%">কোথায়</th><th>কী হয়</th></tr>
+  <tr><td>401 হলে স্বয়ংক্রিয় redirect</td><td><span class="mono">lib/api.js</span></td><td>সরাসরি <span class="mono">/auth</span>-এ পাঠিয়ে দেয়</td></tr>
+  <tr><td>Form-এ লাল বার্তা</td><td>AuthForm, verify, checkout, product edit</td><td><span class="mono">setError(err.message)</span> → <span class="mono">&lt;p class="errorText"&gt;</span></td></tr>
+  <tr><td>Fallback ডেটা + ব্যানার</td><td>marketplace, homepage</td><td>ডেমো মান দেখায় কিন্তু স্পষ্ট করে বলে দেয়</td></tr>
+  <tr><td>Skeleton loader</td><td>প্রায় সব পেজ</td><td><span class="mono">&lt;div className="skeletonCard tall" /&gt;</span> — খালি সাদা পর্দা নয়</td></tr>
+  <tr><td>খালি অবস্থার বার্তা</td><td>cart, orders, wishlist, review</td><td>“Your cart is empty. Browse the marketplace…”</td></tr>
+  <tr><td>বোতামের অবস্থা</td><td>AddToCart, upload, archive</td><td>idle → loading → done/error, এবং <span class="mono">disabled</span></td></tr>
+  <tr><td>ধ্বংসাত্মক কাজে confirmation</td><td>archive ও restore</td><td><span class="mono">window.confirm</span></td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch38"><span class="num">38</span>Testing<span class="mk">[[C38]]</span></h1>
+
+<h2>38.1 কী কী পরীক্ষা করা হয়</h2>
+<table class="data">
+  <tr><th style="width:26%">ধরন</th><th style="width:20%">কমান্ড</th><th class="c" style="width:12%">ফলাফল</th><th>টীকা</th></tr>
+  <tr><td>Web unit tests</td><td><span class="mono">npm test</span> (<span class="mono">node --test test/</span>)</td>
+      <td class="c"><strong>26 / 26 পাস</strong></td><td>ডাটাবেস বা Next.js runtime ছাড়াই চলে</td></tr>
+  <tr><td>SDK contract tests</td><td><span class="mono">cd fair-harvest-sdk &amp;&amp; npm test</span></td>
+      <td class="c"><strong>5 / 5 পাস</strong></td><td>URL গঠন, header, envelope যাচাই</td></tr>
+  <tr><td>Lint</td><td><span class="mono">npm run lint</span></td><td class="c"><strong>0 error</strong></td>
+      <td>৯টি warning — সবই আগে থেকেই ছিল (<span class="mono">&lt;img&gt;</span> বনাম <span class="mono">&lt;Image /&gt;</span> ইত্যাদি)</td></tr>
+  <tr><td>Production build</td><td><span class="mono">npm run build</span></td><td class="c"><strong>সফল</strong></td>
+      <td><span class="mono">prisma generate</span> + <span class="mono">migrate deploy</span> + <span class="mono">next build</span></td></tr>
+  <tr><td>Manual UI যাচাই</td><td>চালু অ্যাপে</td><td class="c"><strong>২৯টি পেজ</strong></td>
+      <td>এই ডকুমেন্টের প্রতিটি screenshot প্রকৃত চালু অ্যাপ থেকে নেওয়া</td></tr>
+</table>
+
+<h2>38.2 ২৬টি unit test কী কী যাচাই করে</h2>
+<table class="data tight">
+  <tr><th style="width:28%">ফাইল</th><th class="c" style="width:10%">টেস্ট</th><th>কী পরীক্ষা হয়</th></tr>
+  <tr><td><span class="mono">imageValidation.test.js</span></td><td class="c">9</td>
+      <td>তিনটি অনুমোদিত MIME, <span class="mono">charset</span> প্যারামিটার উপেক্ষা করা,
+      SVG/GIF/PDF/HTML প্রত্যাখ্যান, ০ byte ও ৩ MB-এর বেশি, storage key গঠন,
+      path traversal (<span class="mono">..</span>) প্রত্যাখ্যান, URL থেকে key উদ্ধার</td></tr>
+  <tr><td><span class="mono">mask.test.js</span></td><td class="c">4</td>
+      <td>শেষ ৪ অক্ষর ছাড়া সব লুকানো, ছোট ইনপুট পুরো লুকানো, <span class="mono">null</span> ইনপুট,
+      “কখনো মূল মান ফেরত দেয় না”</td></tr>
+  <tr><td><span class="mono">reputation.test.js</span></td><td class="c">4</td>
+      <td>ইতিহাসহীন নতুন কৃষকের নিরপেক্ষ score, verified+ভালো review &gt; rejected+খারাপ,
+      ০–১০০ সীমা, badge-এর ধাপ</td></tr>
+  <tr><td><span class="mono">earnings.test.js</span></td><td class="c">3</td>
+      <td>completed/pending/cancelled ভাগ, খালি তালিকায় শূন্য, এবং
+      <em>“never calls this a payout”</em></td></tr>
+  <tr><td><span class="mono">rateLimit.test.js</span></td><td class="c">3</td>
+      <td>সীমার নিচে অনুমোদন, সীমা ছাড়ালে 429, আলাদা IP আলাদা হিসাব</td></tr>
+  <tr><td><span class="mono">reviews.test.js</span></td><td class="c">3</td>
+      <td>আগে review দিলে <span class="mono">already_reviewed</span>, না কিনলে
+      <span class="mono">not_purchased</span>, DELIVERED থাকলে যোগ্য</td></tr>
+</table>
+
+<div class="box info">
+  <span class="boxTitle">টেস্টগুলো ডাটাবেস ছাড়া চলে কীভাবে?</span>
+  <p>কারণ যে logic পরীক্ষা করা হচ্ছে সেগুলো ইচ্ছাকৃতভাবে <em>pure function</em> হিসেবে আলাদা রাখা
+  হয়েছে — কোনো Prisma বা <span class="mono">next/server</span> import নেই। এমনকি
+  <span class="mono">ApiError</span>-কে আলাদা <span class="mono">apiError.js</span> ফাইলে রাখা হয়েছে
+  শুধু এই কারণেই, যাতে <span class="mono">rateLimit.js</span> টেস্ট করতে গিয়ে পুরো Next.js runtime
+  টেনে আনতে না হয়। এটি testability-র জন্য একটি সচেতন স্থাপত্য সিদ্ধান্ত।</p>
+</div>
+
+<h2>38.3 যা পরীক্ষা করা হয় না <span class="chip no">সীমাবদ্ধতা</span></h2>
+<ul>
+  <li><strong>Integration / route test নেই</strong> — সম্পূর্ণ request→response চক্র স্বয়ংক্রিয়ভাবে
+      পরীক্ষা হয় না (auth, ownership, IDOR ইত্যাদি হাতে যাচাই করা হয়েছে)।</li>
+  <li><strong>React component test নেই</strong> — কোনো React Testing Library বা Jest নেই।</li>
+  <li><strong>End-to-end test নেই</strong> — Playwright/Cypress ব্যবহার করা হয়নি।</li>
+  <li><strong>Code coverage মাপা হয় না।</strong></li>
+  <li><strong>CI pipeline নেই</strong> — <span class="mono">.github/workflows</span> নেই; টেস্ট হাতে চালাতে হয়।</li>
+  <li><strong>Load / performance test নেই।</strong></li>
+</ul>
+
+
+<h1 class="chapter" id="ch39"><span class="num">39</span>Deployment — GitHub → Vercel → Neon → Blob<span class="mk">[[C39]]</span></h1>
+
+<figure class="wide">
+  <img src="diagrams/d9-deploy.svg" alt="Deployment architecture">
+  <figcaption class="caption">চিত্র 37: সম্পূর্ণ deployment pipeline — কোড push থেকে চালু production পর্যন্ত।</figcaption>
+</figure>
+
+<h2>39.1 ধাপে ধাপে</h2>
+<ol>
+  <li>ডেভেলপার GitHub-এ push করেন (<span class="mono">github.com/fardaus12345/fair-harvest</span>)।</li>
+  <li>GitHub-এর webhook Vercel-কে জানায়।</li>
+  <li>Vercel <span class="mono">npm install</span> চালায় → <span class="mono">postinstall</span> হিসেবে
+      <span class="mono">prisma generate</span>।</li>
+  <li><span class="mono">npm run build</span> চালায়, যার ভিতরে তিনটি ধাপ:
+      <pre>"build": "prisma generate &amp;&amp; prisma migrate deploy &amp;&amp; next build"</pre>
+      অর্থাৎ <strong>প্রতিটি deploy-এ ডাটাবেসের migration নিজে থেকেই প্রয়োগ হয়ে যায়</strong>।</li>
+  <li>Build সফল হলে Vercel serverless function ও CDN-এ প্রকাশ করে।</li>
+  <li>চলার সময় অ্যাপ Neon PostgreSQL (pooled সংযোগ) ও Vercel Blob ব্যবহার করে।</li>
+</ol>
+
+<h2>39.2 Production বনাম Preview</h2>
+<table class="data">
+  <tr><th style="width:20%">Deployment</th><th style="width:24%">কোন branch</th><th>ব্যবহার</th></tr>
+  <tr><td><strong>Production</strong></td><td><span class="mono">main</span></td><td>প্রকৃত লাইভ সাইট</td></tr>
+  <tr><td><strong>Preview</strong></td><td>অন্য প্রতিটি branch (যেমন <span class="mono">feature/marketplace-completion</span>)</td>
+      <td>merge করার আগে আলাদা URL-এ পরীক্ষা করা</td></tr>
+</table>
+
+<h2>39.3 Deployment-এ যে তিনটি প্রকৃত সমস্যা হয়েছিল ও সমাধান</h2>
+<table class="data">
+  <tr><th style="width:24%">সমস্যা</th><th style="width:30%">মূল কারণ</th><th>সমাধান</th></tr>
+  <tr><td>Build ব্যর্থ — “Failed to build / because it took more than 60 seconds”</td>
+      <td>হোমপেজ static generation-এর সময় নিজের HTTP API-তে কল করছিল, কিন্তু সেই সময় server তো
+      এখনো চালুই হয়নি — request ঝুলে থাকত</td>
+      <td><span class="mono">safeApi()</span>-তে server-side + relative base হলে সরাসরি fallback,
+      এবং প্রতিটি fetch-এ ৫ সেকেন্ডের <span class="mono">AbortSignal.timeout</span></td></tr>
+  <tr><td>Production login-এ “Internal server error”</td>
+      <td><span class="mono">main</span> branch-এ তখনো <span class="mono">provider = "sqlite"</span>
+      ছিল, অথচ <span class="mono">DATABASE_URL</span> PostgreSQL-এর</td>
+      <td>PostgreSQL migration branch-টি <span class="mono">main</span>-এ fast-forward merge করা</td></tr>
+  <tr><td>ছবি আপলোডে <span class="mono">ENOENT … mkdir '/var/task/…/storage'</span></td>
+      <td>Production-এ <span class="mono">STORAGE_PROVIDER</span> সেট করা ছিল না, তাই ডিফল্ট
+      <span class="mono">local</span> চলছিল — কিন্তু serverless ফাইল সিস্টেম read-only</td>
+      <td>Vercel-এ <span class="mono">STORAGE_PROVIDER=object</span> + Blob store যুক্ত করা</td></tr>
+</table>
+<div class="box ok">
+  <span class="boxTitle">ভাইভায় এটি বলুন</span>
+  <p>এই তিনটি ঘটনা প্রমাণ করে প্রজেক্টটি সত্যিই deploy করা হয়েছে এবং বাস্তব সমস্যার মুখোমুখি হয়ে
+  সমাধান করা হয়েছে। “আমি শুধু localhost-এ চালিয়েছি” বলার চেয়ে এটি অনেক শক্তিশালী উত্তর।</p>
+</div>
+
+<h2>39.4 Docker (বিকল্প পথ)</h2>
+<p>প্রজেক্টে একটি সরল <span class="mono">Dockerfile</span> আছে
+(<span class="mono">node:22-alpine</span> → <span class="mono">npm install</span> →
+<span class="mono">npm run build</span> → <span class="mono">npm start</span>, পোর্ট ৩০০০)।
+এটি Vercel ছাড়া অন্য কোথাও চালানোর সুযোগ রাখে, তবে প্রধান deployment পথ Vercel।</p>
+
+
+<h1 class="chapter" id="ch40"><span class="num">40</span>Environment Variables<span class="mk">[[C40]]</span></h1>
+
+<div class="box bad">
+  <span class="boxTitle">এই ডকুমেন্টে কোনো প্রকৃত গোপন মান নেই</span>
+  <p>নিচের তালিকায় শুধু নাম ও উদ্দেশ্য আছে। প্রতিটি গোপন মানের জায়গায়
+  <strong>[SECRET — NOT SHOWN]</strong> লেখা। ভাইভাতেও কখনো আসল টোকেন বা পাসওয়ার্ড স্ক্রিনে
+  দেখাবেন না।</p>
+</div>
+
+<table class="data tight">
+  <tr><th style="width:22%">Variable</th><th style="width:30%">উদ্দেশ্য</th><th style="width:16%">কোথায় লাগে</th><th class="c" style="width:10%">গোপন?</th><th>মান</th></tr>
+  <tr><td><span class="mono">DATABASE_URL</span></td><td>অ্যাপ চলার সময়ের pooled PostgreSQL সংযোগ</td>
+      <td>dev + production</td><td class="c">হ্যাঁ</td><td>[SECRET — NOT SHOWN]</td></tr>
+  <tr><td><span class="mono">DIRECT_URL</span></td><td><span class="mono">prisma migrate</span>-এর জন্য direct সংযোগ</td>
+      <td>dev + production</td><td class="c">হ্যাঁ</td><td>[SECRET — NOT SHOWN]</td></tr>
+  <tr><td><span class="mono">JWT_SECRET</span></td><td>JWT signature-এর চাবি</td>
+      <td>dev + production</td><td class="c">হ্যাঁ</td><td>[SECRET — NOT SHOWN] · production-এ না থাকলে অ্যাপ চালুই হয় না</td></tr>
+  <tr><td><span class="mono">JWT_EXPIRES_IN</span></td><td>টোকেনের মেয়াদ</td><td>উভয়</td><td class="c">না</td><td><span class="mono">2h</span> (ডিফল্ট)</td></tr>
+  <tr><td><span class="mono">VERIFICATION_PROVIDER</span></td><td>কোন Farmer Card provider</td><td>উভয়</td><td class="c">না</td>
+      <td><span class="mono">demo</span> | <span class="mono">official</span></td></tr>
+  <tr><td><span class="mono">GOV_API_BASE_URL</span></td><td>ভবিষ্যতের সরকারি API-র ঠিকানা</td><td>ঐচ্ছিক</td><td class="c">না</td><td>বর্তমানে খালি</td></tr>
+  <tr><td><span class="mono">GOV_API_KEY</span></td><td>সেই API-র credential</td><td>ঐচ্ছিক</td><td class="c">হ্যাঁ</td><td>[SECRET — NOT SHOWN] · বর্তমানে খালি</td></tr>
+  <tr><td><span class="mono">STORAGE_PROVIDER</span></td><td>ছবি কোথায় রাখা হবে</td><td>উভয়</td><td class="c">না</td>
+      <td><span class="mono">local</span> (dev) | <span class="mono">object</span> (<strong>production-এ আবশ্যক</strong>)</td></tr>
+  <tr><td><span class="mono">UPLOAD_DIR</span></td><td>local provider-এর ফোল্ডার</td><td>শুধু dev</td><td class="c">না</td><td><span class="mono">./storage/uploads</span></td></tr>
+  <tr><td><span class="mono">BLOB_READ_WRITE_TOKEN</span></td><td>Vercel Blob-এ লেখার অনুমতি</td><td>production</td><td class="c">হ্যাঁ</td>
+      <td>[SECRET — NOT SHOWN] · Blob store যুক্ত করলে Vercel নিজেই দেয়</td></tr>
+  <tr><td><span class="mono">BLOB_PUBLIC_BASE_URL</span></td><td>ছবির CDN base — ছবি মোছার জন্য দরকার</td><td>production</td><td class="c">না</td>
+      <td><span class="mono">https://&lt;store-id&gt;.public.blob.vercel-storage.com</span></td></tr>
+  <tr><td><span class="mono">NEXT_PUBLIC_API_BASE_URL</span></td><td>SDK client-এর base</td><td>dev</td><td class="c">না</td>
+      <td><strong>Vercel-এ সেট করা যাবে না</strong> — করলে build timeout হয়</td></tr>
+  <tr><td><span class="mono">NEXT_PUBLIC_API_URL</span></td><td><span class="mono">lib/api.js</span>-এর base</td><td>dev</td><td class="c">না</td>
+      <td>খালি থাকলে <span class="mono">/api/v1</span> (same-origin)</td></tr>
+  <tr><td><span class="mono">ALLOWED_ORIGINS</span></td><td>CORS allow-list (কমা দিয়ে আলাদা)</td><td>ঐচ্ছিক</td><td class="c">না</td>
+      <td>খালি = same-origin only</td></tr>
+  <tr><td><span class="mono">SEED_DEMO_DATA</span></td><td><span class="mono">"false"</span> দিলে seed এড়িয়ে যায়</td><td>ঐচ্ছিক</td><td class="c">না</td><td><span class="mono">true</span></td></tr>
+  <tr><td><span class="mono">NODE_ENV</span></td><td>Next.js নিজেই সেট করে</td><td>স্বয়ংক্রিয়</td><td class="c">না</td><td><span class="mono">development</span> | <span class="mono">production</span></td></tr>
+</table>
+
+<h2>40.1 <span class="mono">.env</span> নাকি <span class="mono">.env.local</span>?</h2>
+<div class="box warn">
+  <p><strong>একটি ফাঁদ যা এই প্রজেক্টে বাস্তবে সমস্যা করেছিল:</strong> Prisma CLI শুধু
+  <span class="mono">.env</span> পড়ে, কিন্তু Next.js <span class="mono">.env</span> ও
+  <span class="mono">.env.local</span> দুটোই পড়ে। তাই <span class="mono">DATABASE_URL</span> ও
+  <span class="mono">DIRECT_URL</span> অবশ্যই <span class="mono">.env</span>-এ রাখতে হয়, নাহলে
+  <span class="mono">prisma migrate</span> ডাটাবেস খুঁজে পায় না। README-তেও এটি লেখা আছে।</p>
+</div>
+<p>দুটি ফাইলই <span class="mono">.gitignore</span>-এ আছে, তাই কোনো গোপন মান কখনো git-এ যায়নি।
+<span class="mono">.env.example</span> শুধু গঠন দেখানোর জন্য — এতে কোনো আসল মান নেই।</p>
+
+
+<h1 class="chapter" id="ch41"><span class="num">41</span>বর্তমান সীমাবদ্ধতা (Known Limitations)<span class="mk">[[C41]]</span></h1>
+
+<p>চারটি শ্রেণিতে ভাগ করা: <span class="chip no">নেই</span> <span class="chip part">আংশিক</span>
+<span class="chip demo">DEMO</span> — এবং কিছু ছোট বাগ।</p>
+
+<h2>41.1 একেবারেই নেই <span class="chip no">Not implemented</span></h2>
+<table class="data tight">
+  <tr><th style="width:30%">বিষয়</th><th>বিস্তারিত</th></tr>
+  <tr><td>প্রকৃত payment gateway</td><td>bKash/Nagad/SSLCommerz/Stripe কিছুই নেই</td></tr>
+  <tr><td>কৃষকের payout</td><td>টাকা কৃষকের কাছে পাঠানোর কোনো ব্যবস্থা নেই</td></tr>
+  <tr><td>প্রকৃত সরকারি API</td><td>শুধু নিজের ডাটাবেসের demo registry</td></tr>
+  <tr><td>ডেলিভারি ব্যবস্থাপনা</td><td>কোনো courier, tracking নম্বর, বা delivery partner নেই</td></tr>
+  <tr><td>Notification</td><td>ইমেইল, SMS, push — কোনোটিই নেই। Notification মডেলও নেই।</td></tr>
+  <tr><td>পাসওয়ার্ড পুনরুদ্ধার</td><td>“Forgot password” নেই</td></tr>
+  <tr><td>ইমেইল যাচাই</td><td>যেকোনো ইমেইল দিয়ে অ্যাকাউন্ট খোলা যায়</td></tr>
+  <tr><td>Profile সম্পাদনা</td><td>নাম, ফোন, পাসওয়ার্ড বদলানোর কোনো UI বা API নেই</td></tr>
+  <tr><td>ক্রেতার order বাতিল</td><td>শুধু কৃষক বা admin status বদলাতে পারে</td></tr>
+  <tr><td>Refund / return</td><td>কোনো ধারণাই নেই</td></tr>
+  <tr><td>Pagination</td><td>কোনো তালিকায় নেই — সব একবারে আসে (audit log-এ শুধু ২০০-র সীমা)</td></tr>
+  <tr><td>Chat / messaging</td><td>ক্রেতা-কৃষক যোগাযোগের উপায় নেই</td></tr>
+  <tr><td>প্রকৃত QR তৈরি/স্ক্যান</td><td>শুধু একটি স্ট্রিং</td></tr>
+  <tr><td>Blockchain</td><td>নেই — এবং API নিজেই তা ঘোষণা করে</td></tr>
+  <tr><td>2FA, CSP, account lockout</td><td>নেই</td></tr>
+  <tr><td>CI/CD pipeline</td><td><span class="mono">.github/workflows</span> নেই</td></tr>
+  <tr><td>Integration ও E2E test</td><td>নেই</td></tr>
+</table>
+
+<h2>41.2 আংশিক <span class="chip part">Partially implemented</span></h2>
+<table class="data tight">
+  <tr><th style="width:30%">বিষয়</th><th>কী আছে, কী নেই</th></tr>
+  <tr><td>Marketplace search</td><td>আছে, কিন্তু শুধু client-side — ইতিমধ্যে লোড হওয়া তালিকার উপর। Admin search অবশ্য server-side।</td></tr>
+  <tr><td><span class="mono">sort_by</span> filter</td><td>frontend পাঠায় কিন্তু server ব্যবহার করে না; সবসময় trustScore অনুসারে সাজানো</td></tr>
+  <tr><td>Rate limiting</td><td>আছে, কিন্তু in-memory — একাধিক server instance-এ নির্ভরযোগ্য নয়</td></tr>
+  <tr><td>Order status ক্রম</td><td>কোনো state machine নেই; যেকোনো status থেকে যেকোনোটিতে যাওয়া যায়</td></tr>
+  <tr><td>Token বাতিলকরণ</td><td>logout বা suspend করলেও পুরোনো JWT ২ ঘণ্টা পর্যন্ত বৈধ থাকে</td></tr>
+  <tr><td>i18n</td><td>১৭৭টি স্ট্রিং অনুবাদিত; বাকি লেখা ইংরেজিই থাকে</td></tr>
+  <tr><td>Audit coverage</td><td>৬ ধরনের কাজ লেখা হয়; order status বদল, পণ্য সম্পাদনা ও login লেখা হয় না</td></tr>
+  <tr><td>Cart-এ stock যাচাই</td><td>শুধু checkout-এ হয়, cart-এ যোগ করার সময় নয়</td></tr>
+  <tr><td>Wishlist-এ archived পণ্য</td><td>থেকে যায় কিন্তু “আর পাওয়া যাচ্ছে না” বলে চিহ্নিত হয় না</td></tr>
+  <tr><td>ডেলিভারি ফি</td><td>স্থির ৬০ টাকা; client ইচ্ছেমতো মান পাঠাতে পারে</td></tr>
+  <tr><td><span class="mono">Product.trustScore</span></td><td>ফিল্ড আছে ও দেখানো হয়, কিন্তু স্বয়ংক্রিয়ভাবে গণনা হয় না</td></tr>
+  <tr><td><span class="mono">PaymentStatus.FAILED</span></td><td>enum-এ আছে, কোথাও বসানো হয় না</td></tr>
+  <tr><td><span class="mono">CartItemSource</span></td><td>তিনটি মান আছে, UI থেকে শুধু DIRECT তৈরি হয়</td></tr>
+</table>
+
+<h2>41.3 ছোট বাগ ও অসঙ্গতি (নিরীক্ষায় ধরা পড়েছে)</h2>
+<table class="data tight">
+  <tr><th style="width:30%">বিষয়</th><th>বিবরণ</th></tr>
+  <tr><td>Farmer dashboard-এ “Active products”</td><td>লেবেলে “Active” লেখা, কিন্তু archived সহ সব পণ্য গোনে</td></tr>
+  <tr><td>Add product-এ category</td><td>drop-down-এ শুধু তিনটি — <span class="mono">herb</span> বাদ পড়েছে (edit form-এ চারটিই আছে)</td></tr>
+  <tr><td>হোমপেজের “On-chain” লেবেল</td><td>একটি অবশিষ্ট স্থির লেখা; trace পেজ স্পষ্টভাবে উল্টো কথা বলে</td></tr>
+  <tr><td>Marketplace-এর “Eco A” badge</td><td>স্থির লেখা, গণনা করা নয়</td></tr>
+  <tr><td>Reputation breakdown</td><td><span class="mono">quality_score</span> ও <span class="mono">review_score</span> একই মান</td></tr>
+  <tr><td>OpenAPI নথি</td><td><span class="mono">/orders/{orderId}/status</span> POST লেখা, বাস্তবে PATCH</td></tr>
+  <tr><td>SDK-তে অস্তিত্বহীন endpoint</td><td><span class="mono">oauth()</span> ও <span class="mono">pushPrescriptionCart()</span> — কোনো route নেই</td></tr>
+  <tr><td>README-র architecture নোট</td><td>এখনো লেখা “Database: SQLite by default” — PostgreSQL-এ যাওয়ার পর হালনাগাদ হয়নি (README-র শুরুতে অবশ্য PostgreSQL-ই লেখা)</td></tr>
+  <tr><td><span class="mono">getRewards()</span>-এ ডিফল্ট</td><td><span class="mono">userId = "u001"</span> — একটি অবশিষ্ট prototype মান (বাস্তবে সব কল আসল id দেয়)</td></tr>
+</table>
+
+<div class="box ok">
+  <span class="boxTitle">এই তালিকাটি দুর্বলতা নয় — এটি আপনার শক্তি</span>
+  <p>যে শিক্ষার্থী নিজের প্রজেক্টের ২০টি সীমাবদ্ধতা মুখস্থ বলতে পারে, বোর্ড বোঝেন তিনি কোড নিজে
+  লিখেছেন এবং বুঝে লিখেছেন। কোনো প্রশ্নে আটকে গেলে বলুন: “ওই অংশটি এই সংস্করণে বাস্তবায়িত হয়নি,
+  আমি জানি এটি কীভাবে যোগ করতে হবে — …”।</p>
+</div>
+
+
+<h1 class="chapter" id="ch42"><span class="num">42</span>ভবিষ্যৎ উন্নয়ন (Future Scope)<span class="mk">[[C42]]</span></h1>
+
+<p>প্রতিটি প্রস্তাব উপরের কোনো একটি প্রকৃত সীমাবদ্ধতা থেকে এসেছে — কল্পনা থেকে নয়।</p>
+
+<table class="data">
+  <tr><th style="width:5%">#</th><th style="width:24%">উন্নয়ন</th><th style="width:24%">কোন সীমাবদ্ধতা দূর করে</th><th>বাস্তবায়নের পথ</th></tr>
+  <tr><td>1</td><td><strong>প্রকৃত payment gateway</strong></td><td>demo payment</td>
+      <td>bKash/SSLCommerz-এর sandbox; <span class="mono">PaymentMethod</span> enum-এ নতুন মান, webhook দিয়ে
+      <span class="mono">PaymentStatus</span> হালনাগাদ। বর্তমান <span class="mono">Payment</span> মডেলই যথেষ্ট।</td></tr>
+  <tr><td>2</td><td><strong>প্রকৃত সরকারি API</strong></td><td>demo registry</td>
+      <td><span class="mono">officialGovApiProvider.js</span>-এ আসল URL ও key বসানো, তারপর
+      <span class="mono">VERIFICATION_PROVIDER=official</span>। <strong>অন্য কোনো ফাইল বদলাতে হবে না</strong> —
+      abstraction-টি ঠিক এই জন্যই তৈরি।</td></tr>
+  <tr><td>3</td><td><strong>Notification</strong></td><td>কোনো জানানোর ব্যবস্থা নেই</td>
+      <td>একটি <span class="mono">Notification</span> মডেল + ইমেইল (Resend) বা SMS। Trigger point
+      ইতিমধ্যেই আছে: verification সিদ্ধান্ত, order status, নতুন review।</td></tr>
+  <tr><td>4</td><td><strong>Distributed rate limiting</strong></td><td>in-memory সীমা</td>
+      <td>Upstash Redis; <span class="mono">enforceRateLimit()</span>-এর ভিতরের
+      <span class="mono">Map</span>-কে Redis দিয়ে বদলানো — interface একই থাকে।</td></tr>
+  <tr><td>5</td><td><strong>Refresh token + HttpOnly cookie</strong></td><td>টোকেন localStorage-এ, বাতিল করা যায় না</td>
+      <td>স্বল্পমেয়াদি access token + দীর্ঘমেয়াদি refresh token ডাটাবেসে; logout-এ refresh token মুছে ফেলা।</td></tr>
+  <tr><td>6</td><td><strong>Server-side search + pagination</strong></td><td>client-side search, pagination নেই</td>
+      <td>Admin product search-এর মতোই <span class="mono">mode: "insensitive"</span> +
+      <span class="mono">skip/take</span>; PostgreSQL full-text search ব্যবহার করা যায়।</td></tr>
+  <tr><td>7</td><td><strong>Order state machine</strong></td><td>যেকোনো status থেকে যেকোনোটিতে</td>
+      <td>অনুমোদিত পরিবর্তনের একটি map; অবৈধ হলে 422।</td></tr>
+  <tr><td>8</td><td><strong>সম্পূর্ণ audit coverage</strong></td><td>৬টি কাজ লেখা হয়</td>
+      <td><span class="mono">recordAudit()</span> ইতিমধ্যেই আছে — শুধু বাকি route-এ যোগ করা; সাথে
+      filter ও pagination।</td></tr>
+  <tr><td>9</td><td><strong>প্রকৃত QR কোড</strong></td><td>শুধু স্ট্রিং</td>
+      <td>একটি QR library দিয়ে <span class="mono">/trace/&lt;id&gt;</span>-এর ছবি তৈরি, যা পণ্যের প্যাকেটে ছাপা যাবে।</td></tr>
+  <tr><td>10</td><td><strong>প্রকৃত ছবি বিশ্লেষণ</strong></td><td>scanner ভুয়া</td>
+      <td>একটি image classification মডেল; বর্তমান API contract অপরিবর্তিত রেখে ভিতরটা বদলানো যায়।</td></tr>
+  <tr><td>11</td><td><strong>ডেলিভারি সংযোগ</strong></td><td>ডেলিভারি নেই</td>
+      <td>Courier partner API + <span class="mono">Order</span>-এ tracking নম্বর; SHIPPED event-এর সাথে সংযুক্ত।</td></tr>
+  <tr><td>12</td><td><strong>সুপারিশ ব্যবস্থা</strong></td><td>নেই</td>
+      <td>Order ইতিহাস থেকে collaborative filtering — ডেটা ইতিমধ্যেই আছে।</td></tr>
+  <tr><td>13</td><td><strong>মোবাইল অ্যাপ</strong></td><td>শুধু ওয়েব</td>
+      <td><span class="mono">@fair-harvest/sdk</span> ইতিমধ্যেই REST client হিসেবে প্রস্তুত —
+      React Native অ্যাপ সরাসরি এটি ব্যবহার করতে পারবে।</td></tr>
+  <tr><td>14</td><td><strong>CI/CD ও test সম্প্রসারণ</strong></td><td>হাতে টেস্ট চালাতে হয়</td>
+      <td>GitHub Actions-এ lint + test + build; পরে route-level integration ও Playwright E2E।</td></tr>
+  <tr><td>15</td><td><strong>Analytics dashboard</strong></td><td>শুধু ৬টি সংখ্যা</td>
+      <td>সময়ভিত্তিক বিক্রয় গ্রাফ, জেলাভিত্তিক বিশ্লেষণ, শীর্ষ কৃষক — সব ডেটা ইতিমধ্যেই আছে।</td></tr>
+</table>

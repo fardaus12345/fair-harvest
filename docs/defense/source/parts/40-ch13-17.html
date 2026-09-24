@@ -1,0 +1,391 @@
+<!--PART:ভাগ ঘ — পণ্য, মার্কেটপ্লেস ও ট্রেসেবিলিটি-->
+<h1 class="chapter" id="ch13"><span class="num">13</span>Product Management<span class="mk">[[C13]]</span></h1>
+
+<h2>13.1 একটি পণ্যের সব ফিল্ড</h2>
+<table class="data tight">
+  <tr><th style="width:21%">ফিল্ড</th><th style="width:13%">ধরন</th><th style="width:12%">ডিফল্ট</th><th>ব্যাখ্যা</th></tr>
+  <tr><td><span class="mono">id</span></td><td>String (cuid)</td><td>auto</td><td>Primary key; URL-এ ব্যবহৃত হয় (<span class="mono">/marketplace/&lt;id&gt;</span>)</td></tr>
+  <tr><td><span class="mono">farmerId</span></td><td>String FK</td><td>—</td><td>কোন <span class="mono">FarmerProfile</span>-এর পণ্য; <span class="mono">onDelete: Cascade</span></td></tr>
+  <tr><td><span class="mono">name</span></td><td>String</td><td>—</td><td>পণ্যের নাম, খালি রাখা যায় না</td></tr>
+  <tr><td><span class="mono">category</span></td><td>enum</td><td>—</td><td><span class="mono">vegetable · fruit · grain · herb</span> — শুধু এই চারটি</td></tr>
+  <tr><td><span class="mono">description</span></td><td>String?</td><td>null</td><td>ঐচ্ছিক বিবরণ</td></tr>
+  <tr><td><span class="mono">priceBdt</span></td><td>Float</td><td>—</td><td>প্রতি কেজির দাম, অবশ্যই ০-এর বেশি</td></tr>
+  <tr><td><span class="mono">quantityKg</span></td><td>Float</td><td>—</td><td>মজুদ; checkout-এ স্বয়ংক্রিয়ভাবে কমে</td></tr>
+  <tr><td><span class="mono">freshnessWindowDays</span></td><td>Int</td><td>2</td><td>কত দিন তাজা থাকবে — কৃষকের দেওয়া তথ্য</td></tr>
+  <tr><td><span class="mono">trustScore</span></td><td>Int</td><td>80</td><td>পণ্যের আস্থা-সূচক <span class="chip part">স্বয়ংক্রিয় নয়</span></td></tr>
+  <tr><td><span class="mono">imageUrl</span></td><td>String?</td><td>null</td><td>ছবির URL (bytes কখনো DB-তে নয়)</td></tr>
+  <tr><td><span class="mono">status</span></td><td>enum</td><td><span class="mono">ACTIVE</span></td><td><span class="mono">ACTIVE · OUT_OF_STOCK · ARCHIVED</span></td></tr>
+  <tr><td><span class="mono">createdAt / updatedAt</span></td><td>DateTime</td><td>auto</td><td>Prisma নিজেই রক্ষণাবেক্ষণ করে</td></tr>
+</table>
+<p>দুটি index আছে — <span class="mono">@@index([category])</span> ও <span class="mono">@@index([status])</span> —
+কারণ marketplace-এর query সবসময় এই দুটি কলাম দিয়ে filter করে।</p>
+
+<h2>13.2 “কৃষক একটি পণ্য যোগ করলে কী কী ঘটে?” (ধাপে ধাপে)</h2>
+<ol>
+  <li>Dashboard-এ “Add product” ফর্ম পূরণ: নাম, category, দাম, stock, এবং ঐচ্ছিক ছবি।</li>
+  <li>ছবি দিলে <strong>আগে</strong> সেটি upload হয় (অধ্যায় 15) এবং
+      <span class="mono">draft.image_url</span>-এ URL বসে।</li>
+  <li>Submit → <span class="mono">createProduct()</span> → <span class="mono">POST /api/v1/products</span>,
+      সাথে <span class="mono">Authorization: Bearer</span> header।</li>
+  <li><span class="mono">requireUser(request)</span> — login না থাকলে 401।</li>
+  <li>Zod <span class="mono">createProductSchema</span>: <span class="mono">price_bdt</span> ও
+      <span class="mono">quantity_kg</span> অবশ্যই ধনাত্মক, <span class="mono">category</span> অবশ্যই
+      চারটির একটি, <span class="mono">image_url</span> সর্বোচ্চ ২০৪৮ অক্ষর। ভুল হলে 422।</li>
+  <li><span class="mono">farmerProfile.findUnique({ id: farmer_id })</span> — না পেলে 404।</li>
+  <li><strong>মালিকানা যাচাই:</strong> <span class="mono">farmer.userId !== session.userId</span> এবং
+      role ADMIN নয় → 403। অর্থাৎ একজন কৃষক অন্যজনের নামে পণ্য দিতে পারেন না।</li>
+  <li><strong>Verification যাচাই:</strong> <span class="mono">farmer.verificationStatus !== "VERIFIED"</span>
+      → <span class="mono">403 "Only verified farmers can list products"</span>।</li>
+  <li><span class="mono">prisma.product.create()</span> — status ডিফল্ট <span class="mono">ACTIVE</span>
+      (lowercase ইনপুটকে <span class="mono">.toUpperCase()</span> করে enum-এ বসানো হয়)।</li>
+  <li><span class="mono">201</span> + <span class="mono">toPublicProduct()</span> দিয়ে সাজানো object।
+      Dashboard তালিকা রিফ্রেশ করে।</li>
+</ol>
+
+<h2>13.3 পণ্য সম্পাদনা (Edit)</h2>
+<p><span class="mono">PATCH /api/v1/products/{productId}</span> — <span class="mono">assertOwnerOrAdmin()</span>
+দিয়ে মালিকানা যাচাই। সব ফিল্ড <em>ঐচ্ছিক</em>; শুধু যেটি পাঠানো হয় সেটিই বদলায়:</p>
+<pre>...(data.price_bdt !== undefined ? { priceBdt: data.price_bdt } : {}),
+...(data.status    !== undefined ? { status: data.status.toUpperCase() } : {})</pre>
+<p>ছবি বদলালে পুরোনো ফাইলটি মুছে ফেলা হয়, যাতে storage-এ অনাথ (orphan) ফাইল জমে না থাকে:</p>
+<pre>if (data.image_url !== undefined &amp;&amp; product.imageUrl &amp;&amp; product.imageUrl !== updated.imageUrl) {
+  const staleKey = storageKeyFromUrl(product.imageUrl);
+  if (staleKey) await deleteObject(staleKey).catch(() =&gt; null);   // best-effort
+}</pre>
+<p>লক্ষণীয় — <span class="mono">.catch(() =&gt; null)</span>। ছবি মুছতে ব্যর্থ হলেও পণ্য আপডেট
+ব্যর্থ হয় না, কারণ মূল কাজটি হলো তথ্য হালনাগাদ করা।</p>
+
+<h2>13.4 দুটি আলাদা জায়গা থেকে সম্পাদনা</h2>
+<table class="data">
+  <tr><th style="width:22%">কে</th><th style="width:34%">কোথায়</th><th>Component</th></tr>
+  <tr><td>কৃষক (শুধু নিজের)</td><td><span class="mono">/farmer/dashboard</span> → “My products” সারি</td>
+      <td><span class="mono">components/products/FarmerProductRow.js</span> — inline edit form</td></tr>
+  <tr><td>Admin (যেকোনো পণ্য)</td><td><span class="mono">/admin/products</span> — search ও filter সহ</td>
+      <td><span class="mono">app/admin/products/page.js</span></td></tr>
+</table>
+<p>দুটোই একই <span class="mono">PATCH /api/v1/products/{id}</span> ব্যবহার করে; পার্থক্য শুধু
+server-side মালিকানা যাচাইয়ে (admin-কে ছাড় দেওয়া হয়)।</p>
+
+<figure class="wide">
+  <img src="shots/24-admin-products" alt="Admin product management">
+  <figcaption class="caption">চিত্র 13: Admin product management (<span class="mono">/admin/products</span>) — search box, category ও status filter, এবং প্রতিটি সারিতে Edit/Archive/Restore বোতাম। ছবি দুটি এই ডকুমেন্ট তৈরির সময় upload API দিয়ে আপলোড করা পরীক্ষামূলক ছবি।</figcaption>
+</figure>
+
+<h2>13.5 Admin search — একটি বাস্তব বাগ যা ধরা পড়েছিল</h2>
+<div class="box info">
+  <span class="boxTitle">PostgreSQL-এ যাওয়ার পর যা শিখতে হলো</span>
+  <p>SQLite-এ ASCII লেখার তুলনা ডিফল্টভাবে case-insensitive, কিন্তু PostgreSQL-এ
+  <span class="mono">LIKE</span> case-<strong>sensitive</strong>। ফলে “spinach” লিখে খুঁজলে
+  “Organic Spinach” আর পাওয়া যেত না। সমাধান — Prisma-র <span class="mono">mode: "insensitive"</span>:</p>
+  <pre>where.OR = [
+  { name:        { contains: search, mode: "insensitive" } },
+  { description: { contains: search, mode: "insensitive" } },
+  { farmer: { user: { name: { contains: search, mode: "insensitive" } } } }
+];</pre>
+  <p>এটি ভাইভায় বলার মতো একটি ভালো উদাহরণ — “ডাটাবেস বদলালে শুধু connection string বদলালেই হয় না,
+  আচরণও যাচাই করতে হয়।”</p>
+</div>
+
+
+<h1 class="chapter" id="ch14"><span class="num">14</span>Product Status, Archive ও Soft Delete<span class="mk">[[C14]]</span></h1>
+
+<h2>14.1 তিনটি status</h2>
+<figure class="wide">
+  <img src="diagrams/d6-product.svg" alt="Product lifecycle">
+  <figcaption class="caption">চিত্র 14: পণ্যের সম্পূর্ণ জীবনচক্র — তিনটি অবস্থা ও তাদের মধ্যে যাতায়াত।</figcaption>
+</figure>
+
+<table class="data">
+  <tr><th style="width:14%">Status</th><th style="width:22%">অর্থ</th><th style="width:20%">কে বসাতে পারে</th><th style="width:22%">Marketplace-এ</th><th>ক্রেতা কিনতে পারে?</th></tr>
+  <tr><td><span class="mono">ACTIVE</span></td><td>বিক্রির জন্য উন্মুক্ত (ডিফল্ট)</td>
+      <td>মালিক কৃষক বা admin</td><td>দেখা যায়</td><td><strong>হ্যাঁ</strong></td></tr>
+  <tr><td><span class="mono">OUT_OF_STOCK</span></td><td>সাময়িকভাবে শেষ</td>
+      <td>মালিক কৃষক বা admin (<span class="mono">PATCH status</span>)</td><td>দেখা যায় না</td>
+      <td>না — cart-এ যোগ করলে <span class="mono">404 "Product is not available"</span></td></tr>
+  <tr><td><span class="mono">ARCHIVED</span></td><td>তালিকা থেকে সরানো, কিন্তু মুছে ফেলা হয়নি</td>
+      <td>মালিক কৃষক বা admin (<span class="mono">DELETE</span>)</td><td>দেখা যায় না</td><td>না</td></tr>
+</table>
+
+<div class="box warn">
+  <span class="boxTitle">গুরুত্বপূর্ণ কারিগরি বিবরণ</span>
+  <p>Marketplace-এর filter-টি বাস্তবে এভাবে কাজ করে:</p>
+  <pre>// app/api/v1/products/route.js
+if (!farmerId) where.status = "ACTIVE";</pre>
+  <p>অর্থাৎ — <span class="mono">farmer_id</span> ছাড়া query (মানে public marketplace) শুধু
+  <span class="mono">ACTIVE</span> দেখায়। কিন্তু <span class="mono">?farmer_id=…</span> দিলে
+  <strong>সব status</strong> ফেরত আসে, কারণ কৃষককে নিজের archived পণ্যও দেখতে হবে।</p>
+</div>
+
+<h2>14.2 Hard delete কেন নেই?</h2>
+<p>এটি ভাইভার একটি প্রিয় প্রশ্ন। উত্তরটি ডাটাবেসের গঠনেই লেখা আছে:</p>
+<pre>model OrderItem {
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  // ↑ কোনো onDelete: Cascade নেই → Prisma-র ডিফল্ট = RESTRICT
+}</pre>
+<p>মানে — যে পণ্যের বিপরীতে একটিও order আছে, সেটিকে ডাটাবেস <strong>মুছতেই দেবে না</strong>।
+আর মুছতে পারলেও ক্ষতি হতো:</p>
+<table class="data">
+  <tr><th style="width:26%">যদি hard delete করা হতো</th><th>কী ভেঙে যেত</th></tr>
+  <tr><td>পুরোনো order</td><td>ক্রেতার order history-তে পণ্যের নাম থাকত না; হিসাব মেলানো যেত না</td></tr>
+  <tr><td>Review</td><td><span class="mono">Review.productId</span> → Product cascade, তাই review-ও মুছে যেত এবং কৃষকের reputation হঠাৎ বদলে যেত</td></tr>
+  <tr><td>TraceEvent</td><td>পণ্যের পুরো ইতিহাস হারিয়ে যেত — অথচ traceability এই প্রজেক্টের মূল প্রতিশ্রুতি</td></tr>
+  <tr><td>Farmer earnings</td><td>বিক্রির হিসাব পাল্টে যেত</td></tr>
+</table>
+
+<h2>14.3 Archive করলে ঠিক কী হয়?</h2>
+<p><span class="mono">DELETE /api/v1/products/{productId}</span> — নাম DELETE হলেও এটি সারিটি মুছে না,
+শুধু <span class="mono">status</span> বদলায়:</p>
+<pre>export async function DELETE(request, { params }) {
+  const session = requireUser(request);
+  enforceRateLimit(request, "product-archive", { max: 20, windowMs: 60_000 });
+  const product = await loadProduct(productId);
+  assertOwnerOrAdmin(session, product);
+
+  const archived = await prisma.product.update({
+    where: { id: productId }, data: { status: "ARCHIVED" }, …
+  });
+
+  await recordAudit({ actorId: session.userId, actorRole: session.role,
+    action: "product_archived", targetType: "Product", targetId: productId,
+    metadata: { previousStatus: product.status, farmerId: product.farmerId } });
+
+  return ok({ product: toPublicProduct(archived) }, { message: "Product archived" });
+}</pre>
+
+<table class="data">
+  <tr><th style="width:26%">কী</th><th>Archive-এর পরে অবস্থা</th></tr>
+  <tr><td>ডাটাবেস সারি</td><td>অক্ষত থাকে, শুধু <span class="mono">status = ARCHIVED</span></td></tr>
+  <tr><td>Marketplace</td><td>আর দেখা যায় না</td></tr>
+  <tr><td>পুরোনো order</td><td>সম্পূর্ণ অক্ষত — <span class="mono">nameSnapshot</span> ও দামও OrderItem-এ আলাদা করে রাখা</td></tr>
+  <tr><td>Review</td><td>অক্ষত, reputation-এ গোনা চলতেই থাকে</td></tr>
+  <tr><td>TraceEvent</td><td>অক্ষত; <span class="mono">/trace/&lt;id&gt;</span> পেজ কাজ করে</td></tr>
+  <tr><td>Wishlist</td><td>সারিটি থেকে যায়, পণ্যটি wishlist পেজে দেখা যায়
+      <span class="chip part">ছোট সীমাবদ্ধতা — archived বলে আলাদা চিহ্ন দেখানো হয় না</span></td></tr>
+  <tr><td>Cart</td><td>আগে থেকে cart-এ থাকলে সারিটি থাকে, কিন্তু checkout-এ stock যাচাইয়ে আটকে যায়
+      <span class="chip part">আংশিক</span></td></tr>
+  <tr><td>ছবি</td><td>মুছে ফেলা হয় <strong>না</strong> — restore করলে ছবিও ফিরে আসে</td></tr>
+  <tr><td>Audit log</td><td>একটি <span class="mono">product_archived</span> এন্ট্রি লেখা হয়</td></tr>
+</table>
+
+<h2>14.4 Restore</h2>
+<p>Restore-এর জন্য আলাদা কোনো endpoint নেই; এটি সাধারণ একটি update:
+<span class="mono">PATCH /api/v1/products/{id}</span> with <span class="mono">{ status: "active" }</span>।
+Admin console-এ archived পণ্যের সারিতে “Restore” বোতাম আসে; কৃষক নিজের edit form-এর Status drop-down
+থেকে আবার <em>active</em> বেছে নিতে পারেন।</p>
+
+<h2>14.5 ভুল ক্লিক ঠেকানো — confirmation</h2>
+<p>Archive ও Restore — দুটোতেই ব্রাউজারের confirmation দেখানো হয়, যাতে একটি অসতর্ক ক্লিকে listing
+বাজার থেকে সরে না যায়:</p>
+<pre>const confirmed = window.confirm(
+  `Archive "${product.name}"?\n\nIt will no longer appear in the marketplace, `
+  + "but it can be restored later.");
+if (!confirmed) return;</pre>
+<p>এটি <span class="mono">FarmerProductRow.js</span> ও <span class="mono">app/admin/products/page.js</span>
+— দুই জায়গাতেই আছে।</p>
+
+<div class="box ok">
+  <span class="boxTitle">Soft Delete (নরম মুছে ফেলা) — এক বাক্যে</span>
+  <p>“Soft delete মানে ডেটা মুছে না ফেলে শুধু নিষ্ক্রিয় করে রাখা। Fair Harvest-এ পণ্য কখনো ডাটাবেস থেকে
+  মুছি না, শুধু <span class="mono">ARCHIVED</span> করি — কারণ <span class="mono">OrderItem</span>-এর
+  foreign key <span class="mono">RESTRICT</span>, আর পুরোনো order, review ও trace ইতিহাস ঠিক রাখা
+  প্ল্যাটফর্মের মূল প্রতিশ্রুতি।”</p>
+</div>
+
+
+<h1 class="chapter" id="ch15"><span class="num">15</span>Product Image Upload ও Storage<span class="mk">[[C15]]</span></h1>
+
+<h2>15.1 সম্পূর্ণ প্রবাহ</h2>
+<figure class="tall">
+  <img src="diagrams/d10-upload.svg" alt="Image upload flow">
+  <figcaption class="caption">চিত্র 15: ছবি আপলোডের ১০টি ধাপ — ব্রাউজার থেকে ডাটাবেসে URL সংরক্ষণ পর্যন্ত।</figcaption>
+</figure>
+
+<h2>15.2 নিয়ম ও সীমা (কোড থেকে যাচাইকৃত)</h2>
+<table class="data">
+  <tr><th style="width:26%">নিয়ম</th><th style="width:26%">মান</th><th>কেন</th></tr>
+  <tr><td>অনুমোদিত ফরম্যাট</td><td><span class="mono">image/jpeg</span>, <span class="mono">image/png</span>, <span class="mono">image/webp</span></td>
+      <td>সব আধুনিক ব্রাউজার সরাসরি দেখাতে পারে</td></tr>
+  <tr><td><strong>SVG নিষিদ্ধ</strong></td><td>ইচ্ছাকৃতভাবে বাদ</td>
+      <td>SVG-তে JavaScript থাকতে পারে, আর ফাইল আমাদেরই origin থেকে পরিবেশিত হয় → XSS ঝুঁকি</td></tr>
+  <tr><td>সর্বোচ্চ আকার</td><td><span class="mono">MAX_IMAGE_BYTES = 3 × 1024 × 1024</span> (৩ MB)</td>
+      <td>বড় ফাইলে পেজ ধীর হয় ও storage খরচ বাড়ে</td></tr>
+  <tr><td>Rate limit</td><td>২০ আপলোড / ৬০ সেকেন্ড (<span class="mono">product-image-upload</span>)</td>
+      <td>একটানা আপলোড করে storage ভরে ফেলা ঠেকানো</td></tr>
+  <tr><td>কে আপলোড করতে পারে</td><td>ADMIN, অথবা <strong>VERIFIED</strong> FARMER</td>
+      <td>যাতে সাধারণ ব্যবহারকারী প্ল্যাটফর্মকে ফ্রি file hosting বানাতে না পারে</td></tr>
+  <tr><td>ফাইলের নাম</td><td><span class="mono">products/&lt;randomUUID&gt;.&lt;ext&gt;</span></td>
+      <td>ক্লায়েন্টের পাঠানো নাম কখনো ব্যবহার হয় না → path traversal অসম্ভব</td></tr>
+</table>
+
+<p>আকার দুইবার যাচাই করা হয় — এটি একটি সচেতন নিরাপত্তা অভ্যাস:</p>
+<pre>const verdict = validateImageUpload({ mimeType: file.type, size: file.size });  // ক্লায়েন্টের দাবি
+…
+const buffer = Buffer.from(await file.arrayBuffer());
+if (buffer.byteLength &gt; MAX_IMAGE_BYTES) throw new ApiError("Image must be smaller than 3 MB", 422);
+// ↑ আসল byte গুনে আবার যাচাই, কারণ file.size ক্লায়েন্টের দেওয়া তথ্য</pre>
+
+<h2>15.3 দুটি storage provider</h2>
+<table class="data">
+  <tr><th style="width:16%">STORAGE_PROVIDER</th><th style="width:22%">Provider ফাইল</th><th style="width:22%">কোথায় রাখে</th><th>যে URL ফেরত দেয়</th></tr>
+  <tr><td><span class="mono">local</span> (ডিফল্ট)</td><td><span class="mono">localDiskProvider.js</span></td>
+      <td><span class="mono">UPLOAD_DIR</span> (ডিফল্ট <span class="mono">./storage/uploads</span>)</td>
+      <td>আপেক্ষিক: <span class="mono">/api/v1/uploads/&lt;key&gt;</span></td></tr>
+  <tr><td><span class="mono">object</span></td><td><span class="mono">objectStorageProvider.js</span></td>
+      <td>Vercel Blob (<span class="mono">@vercel/blob</span>)</td>
+      <td>সম্পূর্ণ CDN URL: <span class="mono">https://&lt;store&gt;.public.blob.vercel-storage.com/…</span></td></tr>
+</table>
+
+<div class="box bad">
+  <span class="boxTitle">Production-এ অবশ্যই <span class="mono">object</span> লাগবে — কেন?</span>
+  <p>Vercel-এর serverless function-এর ফাইল সিস্টেম <span class="mono">/tmp</span> ছাড়া
+  <strong>read-only</strong>, আর প্রতিটি invocation-এর পর সেটি মুছে যায়। তাই local provider
+  production-এ চললে <span class="mono">ENOENT: no such file or directory, mkdir
+  '/var/task/fair-harvest-web/storage'</span> ত্রুটি দেয় — এই প্রজেক্টে বাস্তবে এই সমস্যাটি ঘটেছিল
+  এবং <span class="mono">STORAGE_PROVIDER=object</span> সেট করে সমাধান হয়েছে।</p>
+</div>
+
+<h2>15.4 ছবি মোছা — orphan ঠেকানো</h2>
+<p><span class="mono">storageKeyFromUrl()</span> একটি সংরক্ষিত URL থেকে আবার key বের করে আনে। দুটি
+রূপই এটি বোঝে:</p>
+<pre>// (১) local: "/api/v1/uploads/products/abc.jpg"  →  "products/abc.jpg"
+// (২) object: "https://xyz.public.blob.vercel-storage.com/products/abc.jpg"
+//              → BLOB_PUBLIC_BASE_URL বাদ দিয়ে → "products/abc.jpg"</pre>
+<p>দ্বিতীয় শাখাটি না থাকলে Vercel Blob-এ প্রতিস্থাপিত প্রতিটি ছবি চিরকাল bucket-এ পড়ে থাকত, যার
+সাথে কোনো পণ্যের সংযোগ নেই — অর্থাৎ ধীরে ধীরে জমতে থাকা আবর্জনা।</p>
+
+<h2>15.5 ডাটাবেসে ছবি রাখা হয় না — কেন?</h2>
+<p><span class="mono">Product.imageUrl</span> শুধু একটি <strong>string</strong>। ছবির bytes কখনো
+PostgreSQL-এ যায় না। কারণ — (ক) ডাটাবেস বড় হয়ে ব্যাকআপ ও query ধীর হয়ে যেত, (খ) CDN থেকে ছবি
+পরিবেশন করা অনেক দ্রুত ও সস্তা, (গ) ডাটাবেস সারিটি ছোট থাকলে join ও index দ্রুত কাজ করে।</p>
+
+<h2>15.6 ছবি না থাকলে?</h2>
+<p><span class="mono">components/products/ProductImage.js</span> একটি gradient টাইল দেখায় যেখানে
+category অনুযায়ী লেখা থাকে (Fresh / Fruit / Grain / Herb), এবং screen-reader-এর জন্য
+<span class="mono">aria-label</span>-এ “(no photo)” যোগ করে। এতে কোনো ভাঙা ছবির আইকন দেখা যায় না।</p>
+
+
+<h1 class="chapter" id="ch16"><span class="num">16</span>Marketplace<span class="mk">[[C16]]</span></h1>
+
+<figure class="wide">
+  <img src="shots/02-marketplace" alt="Marketplace page">
+  <figcaption class="caption">চিত্র 16: Marketplace (<span class="mono">/marketplace</span>) — বাম পাশে filter প্যানেল, উপরে search, এবং trust score সহ product card।</figcaption>
+</figure>
+
+<h2>16.1 ডেটা কীভাবে পর্দায় আসে</h2>
+<pre>MarketplacePage (client component)
+   └─ useEffect → getProducts(filters)            lib/api.js
+        └─ GET /api/v1/products?category=&amp;min_trust=&amp;max_price=
+             └─ prisma.product.findMany({ where, include: farmer.user,
+                                          orderBy: { trustScore: "desc" } })
+                  └─ products.map(toPublicProduct)     serializers.js
+                       └─ setProducts(…) → &lt;article className="productCard"&gt;</pre>
+
+<h2>16.2 Filter ও Search</h2>
+<table class="data">
+  <tr><th style="width:20%">নিয়ন্ত্রণ</th><th style="width:16%">Query param</th><th style="width:16%">কোথায় চলে</th><th>বাস্তবায়ন</th></tr>
+  <tr><td>Category</td><td><span class="mono">category</span></td><td>Server</td><td>enum-এ থাকলে তবেই <span class="mono">where.category</span></td></tr>
+  <tr><td>Min trust score</td><td><span class="mono">min_trust</span></td><td>Server</td><td><span class="mono">where.trustScore = { gte: Number(...) }</span></td></tr>
+  <tr><td>Max price</td><td><span class="mono">max_price</span></td><td>Server</td><td><span class="mono">where.priceBdt = { lte: Number(...) }</span></td></tr>
+  <tr><td>Farmer</td><td><span class="mono">farmer_id</span></td><td>Server</td><td>দিলে সব status ফেরত আসে (কৃষকের নিজের তালিকা)</td></tr>
+  <tr><td><strong>Search box</strong></td><td>—</td><td><strong>Client</strong></td>
+      <td><span class="chip part">আংশিক</span> — শুধু ইতিমধ্যে লোড হওয়া তালিকার উপর
+      <span class="mono">product.name.toLowerCase().includes(search)</span>। Server-এ যায় না।</td></tr>
+  <tr><td><span class="mono">sort_by</span></td><td>পাঠানো হয়</td><td>—</td>
+      <td><span class="chip no">কাজ করে না</span> — server এটি পড়েই না; ফলাফল সবসময়
+      <span class="mono">trustScore desc</span> অনুসারে সাজানো</td></tr>
+</table>
+
+<h2>16.3 Product card-এ কী কী দেখানো হয়</h2>
+<ul>
+  <li>ছবি (বা category-ভিত্তিক fallback টাইল)</li>
+  <li>নাম → product detail পেজের লিংক</li>
+  <li><span class="mono">trust_score</span> badge — ৮০-এর বেশি হলে সবুজ, নাহলে হলুদ</li>
+  <li>কৃষকের নাম ও জেলা</li>
+  <li>Freshness bar — <span class="mono">min(100, freshness_window_days × 30)</span> শতাংশ</li>
+  <li>দাম (BDT/kg) ও একটি স্থির “Eco A” badge <span class="chip no">স্থির লেখা — গণনা করা নয়</span></li>
+  <li>“Add” বোতাম ও “View trace” লিংক</li>
+</ul>
+
+<h2>16.4 API পৌঁছাতে না পারলে</h2>
+<p>একটি <span class="mono">catch</span> ব্লক দুটি উদাহরণ listing দেখায় এবং উপরে লাল-হলুদ ব্যানার লেখে:
+<em>“Could not reach the marketplace API — showing 2 example listings only.”</em> — অর্থাৎ ব্যবহারকারীকে
+মিথ্যা বলা হয় না যে এগুলোই আসল পণ্য।</p>
+
+<h2>16.5 Product detail পেজ</h2>
+<p><span class="mono">app/marketplace/[productId]/page.js</span> একটি <strong>React Server Component</strong>
+(<span class="mono">async function</span>) — অর্থাৎ HTML server-এ তৈরি হয়ে আসে, যা SEO ও প্রথম লোডের
+জন্য ভালো। পেজে চারটি প্যানেল: ছবি, বিবরণ ও দাম, কৃষকের তথ্য (verified badge সহ), এবং listing status।
+নিচে <span class="mono">ReviewsSection</span> component।</p>
+
+<figure class="wide">
+  <img src="shots/17-product-reviews" alt="Product detail with reviews">
+  <figcaption class="caption">চিত্র 17: পণ্যের বিস্তারিত পেজ — নিচে Reviews সেকশনে একটি প্রকৃত ৫ তারা review এবং লগ-ইন করা ক্রেতার জন্য review ফর্ম।</figcaption>
+</figure>
+
+<figure class="half">
+  <img src="shots/29-mobile-marketplace" alt="Mobile marketplace">
+  <figcaption class="caption">চিত্র 18: একই marketplace ৩৯০px মোবাইল প্রস্থে — header এক সারিতে, product card এক কলামে।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch17"><span class="num">17</span>Traceability — মাটি থেকে প্লেট<span class="mk">[[C17]]</span></h1>
+
+<h2>17.1 ধারণাটি কী?</h2>
+<p>প্রতিটি পণ্যের জীবনে ছয়টি ধাপ থাকে। কৃষক প্রতিটি ধাপ ঘটার সাথে সাথে একটি
+<span class="mono">TraceEvent</span> সারি যোগ করেন, আর ক্রেতা <span class="mono">/trace/&lt;productId&gt;</span>
+পেজে সেই timeline দেখতে পান।</p>
+
+<table class="data">
+  <tr><th class="c" style="width:6%">#</th><th style="width:20%">TraceStage</th><th style="width:18%">বাংলা</th><th>সাধারণত কী বোঝায়</th></tr>
+  <tr><td class="c">1</td><td><span class="mono">PLANTED</span></td><td>রোপণ</td><td>বীজ বোনা হলো</td></tr>
+  <tr><td class="c">2</td><td><span class="mono">HARVESTED</span></td><td>ফসল তোলা</td><td>ফসল কাটা হলো</td></tr>
+  <tr><td class="c">3</td><td><span class="mono">LAB_TESTED</span></td><td>ল্যাব পরীক্ষা</td><td>কীটনাশকের অবশিষ্টাংশ পরীক্ষা</td></tr>
+  <tr><td class="c">4</td><td><span class="mono">PACKAGED</span></td><td>প্যাকেজিং</td><td>বাক্সে ভরা হলো</td></tr>
+  <tr><td class="c">5</td><td><span class="mono">SHIPPED</span></td><td>পরিবহন</td><td>বিতরণ কেন্দ্রে পাঠানো</td></tr>
+  <tr><td class="c">6</td><td><span class="mono">LISTED</span></td><td>তালিকাভুক্ত</td><td>Fair Harvest-এ বিক্রির জন্য এলো</td></tr>
+</table>
+
+<h2>17.2 কে event যোগ করতে পারে?</h2>
+<p><span class="mono">POST /api/v1/trace/{productId}</span> — <span class="mono">requireUser</span>, তারপর:</p>
+<pre>if (session.role !== "ADMIN" &amp;&amp; session.userId !== product.farmer.userId) {
+  throw new ApiError("You do not have permission to update this product's trace", 403);
+}</pre>
+<p>Zod দিয়ে <span class="mono">stage</span> (ছয়টির একটি), ঐচ্ছিক <span class="mono">note</span>
+(সর্বোচ্চ ৫০০ অক্ষর) এবং ঐচ্ছিক GPS (<span class="mono">lat -90…90</span>,
+<span class="mono">lng -180…180</span>) যাচাই হয়।</p>
+
+<h2>17.3 যে ধাপ এখনো হয়নি, সেটি কী দেখায়?</h2>
+<p><span class="mono">toPublicTrace()</span> সবসময় ছয়টি ধাপই ফেরত দেয়, কিন্তু যেটির কোনো event নেই
+সেটির <span class="mono">completed: false</span> ও <span class="mono">timestamp: null</span>। UI-তে
+সেটি ধূসর “Pending” হিসেবে দেখায়।</p>
+<div class="box ok">
+  <span class="boxTitle">এটি একটি সৎ ডিজাইন</span>
+  <p>অনেক প্রজেক্টে খালি ধাপগুলোতে বানানো তারিখ বসিয়ে দেওয়া হয়, যাতে দেখতে ভালো লাগে। এখানে
+  ইচ্ছাকৃতভাবে তা করা হয়নি — কোডের কমেন্টেই লেখা: <em>“no fabricated timestamps.”</em></p>
+</div>
+
+<h2>17.4 Blockchain আছে কি? — <span class="chip no">না</span></h2>
+<p>API response-এ দুটি ফিল্ড ইচ্ছাকৃতভাবে রাখা হয়েছে যাতে কেউ ভুল না বোঝে:</p>
+<pre>ledger_type: "database",
+verification_note: "Traceability data is stored in the Fair Harvest database and
+                    entered by the farmer. No blockchain or third-party ledger is used."</pre>
+<p>কোডের কমেন্টেও লেখা আছে — একটি <span class="mono">verified_on_chain</span> boolean রাখা হয়নি,
+কারণ সেটি একটি সাধারণ ডাটাবেস সারিকে “on-chain সত্য” বলে ভুলভাবে উপস্থাপন করত।</p>
+<div class="box warn">
+  <span class="boxTitle">হোমপেজে একটি অসঙ্গতি — নিজে থেকেই স্বীকার করুন</span>
+  <p>হোমপেজের TrustCard-এ একটি স্থির “On-chain” লেখা chip আছে
+  (<span class="mono">app/page.js</span>-এর <span class="mono">&lt;span className="chainChip"&gt;On-chain&lt;/span&gt;</span>)।
+  এটি নিছক ডিজাইনের লেখা; এর পিছনে কোনো blockchain নেই এবং trace পেজ স্পষ্টভাবে উল্টো কথা বলে।
+  বোর্ড ধরলে সরাসরি বলুন এটি একটি অবশিষ্ট UI লেবেল যা সরানো উচিত।</p>
+</div>
+
+<h2>17.5 QR কোড</h2>
+<p>Response-এ <span class="mono">qr_code: "qr_&lt;productId&gt;"</span> নামে একটি স্ট্রিং আসে এবং trace
+পেজে সেটি লেখা হিসেবে দেখানো হয়। <span class="chip no">কোনো প্রকৃত QR ছবি তৈরি বা স্ক্যান করা হয় না</span> —
+এটি একটি পরিচয়সূচক স্ট্রিং মাত্র।</p>
+
+<figure class="wide">
+  <img src="shots/04-trace" alt="Traceability page">
+  <figcaption class="caption">চিত্র 19: <span class="mono">/trace/seed-product-spinach</span> — ছয়টি ধাপের supply chain timeline, খামারের GPS অবস্থান এবং “Record source” প্যানেলে স্পষ্ট ঘোষণা যে এটি ডাটাবেস-ভিত্তিক, blockchain নয়।</figcaption>
+</figure>

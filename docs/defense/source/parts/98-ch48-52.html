@@ -1,0 +1,267 @@
+<h1 class="chapter" id="ch48"><span class="num">48</span>Technical Glossary<span class="mk">[[C48]]</span></h1>
+
+<table class="data tight">
+  <tr><th style="width:18%">Term</th><th style="width:30%">সহজ বাংলা অর্থ</th><th>Fair Harvest-এ কোথায়</th></tr>
+  <tr><td><strong>API</strong></td><td>দুই সফটওয়্যারের কথা বলার নিয়মকানুন</td><td>৬৪টি endpoint <span class="mono">/api/v1</span>-এ</td></tr>
+  <tr><td><strong>REST API</strong></td><td>URL + HTTP method দিয়ে সাজানো API-র একটি রীতি</td><td><span class="mono">GET /products</span>, <span class="mono">POST /reviews</span></td></tr>
+  <tr><td><strong>Endpoint</strong></td><td>API-র একটি নির্দিষ্ট ঠিকানা</td><td><span class="mono">/api/v1/auth/login</span></td></tr>
+  <tr><td><strong>JWT</strong></td><td>সিল করা ডিজিটাল পরিচয়পত্র</td><td><span class="mono">signToken()</span>, HS256, ২ ঘণ্টা</td></tr>
+  <tr><td><strong>Authentication</strong></td><td>তুমি আসলেই কে, তা প্রমাণ করা</td><td><span class="mono">/auth/login</span></td></tr>
+  <tr><td><strong>Authorization</strong></td><td>তুমি কী করতে পারবে, তা নির্ধারণ করা</td><td><span class="mono">requireRole</span>, <span class="mono">requireOwnerOrRole</span></td></tr>
+  <tr><td><strong>Hashing</strong></td><td>এমনভাবে গোপন করা যা আর ফিরিয়ে আনা যায় না</td><td><span class="mono">bcrypt.hash(password, 10)</span></td></tr>
+  <tr><td><strong>Salt</strong></td><td>hash-এর সাথে মেশানো এলোমেলো টুকরো</td><td>bcrypt নিজেই যোগ করে</td></tr>
+  <tr><td><strong>Middleware</strong></td><td>request মূল কাজে পৌঁছানোর আগে যে স্তর দিয়ে যায়</td><td><span class="mono">middleware.js</span> (CORS)</td></tr>
+  <tr><td><strong>ORM</strong></td><td>ডাটাবেসের সারি ও কোডের object-এর অনুবাদক</td><td>Prisma</td></tr>
+  <tr><td><strong>Schema</strong></td><td>ডাটাবেসের নকশা — কোন টেবিলে কী থাকবে</td><td><span class="mono">prisma/schema.prisma</span></td></tr>
+  <tr><td><strong>Migration</strong></td><td>ডাটাবেসের গঠন পরিবর্তনের নথিভুক্ত ধাপ</td><td><span class="mono">20260922135451_init</span></td></tr>
+  <tr><td><strong>Seed</strong></td><td>শুরুতে ডেমো ডেটা ভরে দেওয়া</td><td><span class="mono">prisma/seed.mjs</span></td></tr>
+  <tr><td><strong>CRUD</strong></td><td>Create, Read, Update, Delete</td><td>পণ্য: POST / GET / PATCH / DELETE(archive)</td></tr>
+  <tr><td><strong>Primary Key</strong></td><td>প্রতিটি সারির অনন্য পরিচয়</td><td>সব মডেলে <span class="mono">id String @id @default(cuid())</span></td></tr>
+  <tr><td><strong>Foreign Key</strong></td><td>এক টেবিলের সারি অন্য টেবিলকে নির্দেশ করা</td><td><span class="mono">Product.farmerId → FarmerProfile.id</span></td></tr>
+  <tr><td><strong>Index</strong></td><td>দ্রুত খোঁজার জন্য ডাটাবেসের সূচিপত্র</td><td><span class="mono">@@index([status])</span></td></tr>
+  <tr><td><strong>Unique constraint</strong></td><td>একই মান দুইবার থাকতে না দেওয়া</td><td><span class="mono">@@unique([customerId, productId])</span></td></tr>
+  <tr><td><strong>Cascade</strong></td><td>মূল সারি মুছলে সন্তান সারিগুলোও মুছে যাওয়া</td><td><span class="mono">User → Cart</span></td></tr>
+  <tr><td><strong>Restrict</strong></td><td>নির্ভরশীল সারি থাকলে মুছতেই না দেওয়া</td><td><span class="mono">Product ← OrderItem</span></td></tr>
+  <tr><td><strong>Soft Delete</strong></td><td>না মুছে শুধু নিষ্ক্রিয় করে রাখা</td><td><span class="mono">status = ARCHIVED</span></td></tr>
+  <tr><td><strong>Transaction</strong></td><td>একগুচ্ছ কাজ — হয় সব, নয়তো কিছুই না</td><td><span class="mono">prisma.$transaction()</span> checkout-এ</td></tr>
+  <tr><td><strong>Normalization</strong></td><td>তথ্যের পুনরাবৃত্তি এড়াতে টেবিল ভাগ করা</td><td>Cart/CartItem, Order/OrderItem</td></tr>
+  <tr><td><strong>Denormalization</strong></td><td>ইচ্ছাকৃতভাবে তথ্য দুইবার রাখা</td><td><span class="mono">OrderItem.nameSnapshot</span></td></tr>
+  <tr><td><strong>Enum</strong></td><td>নির্দিষ্ট কয়েকটি মানের তালিকা</td><td><span class="mono">ProductStatus</span> ইত্যাদি ১৩টি</td></tr>
+  <tr><td><strong>Validation</strong></td><td>আসা তথ্য ঠিক আছে কি না যাচাই</td><td>Zod schema, ব্যর্থ হলে 422</td></tr>
+  <tr><td><strong>Rate Limiting</strong></td><td>নির্দিষ্ট সময়ে সর্বোচ্চ কতবার — তার সীমা</td><td><span class="mono">enforceRateLimit()</span></td></tr>
+  <tr><td><strong>Audit Log</strong></td><td>কে কখন কী করল তার খাতা</td><td><span class="mono">AuditLog</span> মডেল</td></tr>
+  <tr><td><strong>Blob Storage</strong></td><td>ফাইল রাখার আলাদা ভান্ডার</td><td>Vercel Blob</td></tr>
+  <tr><td><strong>CDN</strong></td><td>ফাইল দ্রুত পরিবেশনের বিতরণ নেটওয়ার্ক</td><td>Blob-এর public URL</td></tr>
+  <tr><td><strong>Deployment</strong></td><td>কোড ইন্টারনেটে চালু করা</td><td>Vercel</td></tr>
+  <tr><td><strong>Environment Variable</strong></td><td>কোডের বাইরে রাখা সেটিংস ও গোপন মান</td><td><span class="mono">JWT_SECRET</span> ইত্যাদি</td></tr>
+  <tr><td><strong>Server Component</strong></td><td>সার্ভারে render হয়, JS ব্রাউজারে যায় না</td><td>হোমপেজ, product detail, trace</td></tr>
+  <tr><td><strong>Client Component</strong></td><td>ব্রাউজারে চলে, state ও ক্লিক সামলায়</td><td><span class="mono">"use client"</span> লেখা প্রতিটি ফাইল</td></tr>
+  <tr><td><strong>Hook</strong></td><td>React-এ পুনর্ব্যবহারযোগ্য যুক্তি</td><td><span class="mono">useSession()</span>, <span class="mono">useCart()</span></td></tr>
+  <tr><td><strong>Serializer</strong></td><td>ডাটাবেস object → API উত্তরের আকার</td><td><span class="mono">toPublicProduct()</span> ইত্যাদি</td></tr>
+  <tr><td><strong>IDOR</strong></td><td>URL-এ অন্যের id বসিয়ে তার ডেটা দেখা</td><td><span class="mono">requireOwnerOrRole</span> দিয়ে প্রতিরোধ</td></tr>
+  <tr><td><strong>XSS</strong></td><td>পেজে ক্ষতিকর script ঢুকিয়ে দেওয়া</td><td>React auto-escape; SVG নিষিদ্ধ</td></tr>
+  <tr><td><strong>SQL Injection</strong></td><td>ইনপুটে SQL লিখে ডাটাবেস দখল</td><td>Prisma-র parameterized query</td></tr>
+  <tr><td><strong>CORS</strong></td><td>অন্য ডোমেইন থেকে API ডাকার নিয়ম</td><td><span class="mono">middleware.js</span> allow-list</td></tr>
+  <tr><td><strong>Connection Pooling</strong></td><td>কয়েকটি ডাটাবেস সংযোগ ভাগ করে ব্যবহার</td><td>Neon pooler (<span class="mono">DATABASE_URL</span>)</td></tr>
+  <tr><td><strong>Idempotent</strong></td><td>একাধিকবার করলেও ফল একই</td><td><span class="mono">upsert</span>-ভিত্তিক seed</td></tr>
+  <tr><td><strong>Stateless</strong></td><td>server কোনো তথ্য মনে রাখে না</td><td>JWT auth</td></tr>
+  <tr><td><strong>Pure function</strong></td><td>শুধু ইনপুট থেকে আউটপুট, কোনো পার্শ্বপ্রতিক্রিয়া নেই</td><td><span class="mono">computeReputation()</span></td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch49"><span class="num">49</span>Code Reference — কোন ফাইল কোথায়<span class="mk">[[C49]]</span></h1>
+
+<p>বোর্ড যদি বলেন “এই অংশটা কোথায় লেখা?” — এই টেবিল থেকে সরাসরি দেখাতে পারবেন।</p>
+
+<table class="data tight">
+  <tr><th style="width:24%">বিষয়</th><th style="width:34%">ফাইল</th><th>গুরুত্বপূর্ণ অংশ</th></tr>
+  <tr><td rowspan="3"><strong>Authentication</strong></td><td><span class="mono">lib/server/auth.js</span></td>
+      <td><span class="mono">hashPassword</span>, <span class="mono">signToken</span>, <span class="mono">decodeToken</span>, তিনটি require helper</td></tr>
+  <tr><td><span class="mono">app/api/v1/auth/login|register|me/route.js</span></td><td>তিনটি endpoint</td></tr>
+  <tr><td><span class="mono">components/auth/AuthForm.js</span> · <span class="mono">useSession.js</span></td><td>form ও localStorage session</td></tr>
+
+  <tr><td rowspan="2"><strong>Authorization</strong></td><td><span class="mono">lib/server/auth.js</span></td>
+      <td><span class="mono">requireUser</span> / <span class="mono">requireRole</span> / <span class="mono">requireOwnerOrRole</span></td></tr>
+  <tr><td><span class="mono">components/RoleGuard.js</span></td><td>UI-স্তরের guard (নিরাপত্তা নয়)</td></tr>
+
+  <tr><td rowspan="3"><strong>Farmer verification</strong></td><td><span class="mono">lib/server/verification/index.js</span></td><td>provider বাছাই</td></tr>
+  <tr><td><span class="mono">…/demoRegistryProvider.js</span></td><td>card + NID + নাম মেলানো, confidence</td></tr>
+  <tr><td><span class="mono">app/api/v1/farmers/[farmerId]/verify/route.js</span></td><td>rate limit → ownership → provider → update</td></tr>
+
+  <tr><td rowspan="2"><strong>Reputation</strong></td><td><span class="mono">lib/server/reputation.js</span></td><td><span class="mono">computeReputation</span>, <span class="mono">badgeForScore</span> (pure)</td></tr>
+  <tr><td><span class="mono">lib/server/reputationSync.js</span></td><td>পড়া বনাম লেখা — দুটি আলাদা ফাংশন</td></tr>
+
+  <tr><td rowspan="3"><strong>Product</strong></td><td><span class="mono">app/api/v1/products/route.js</span></td><td>GET তালিকা · POST (verification gate)</td></tr>
+  <tr><td><span class="mono">app/api/v1/products/[productId]/route.js</span></td><td>GET · PATCH · DELETE (archive + audit)</td></tr>
+  <tr><td><span class="mono">components/products/FarmerProductRow.js</span></td><td>inline edit + archive confirmation</td></tr>
+
+  <tr><td rowspan="3"><strong>Image storage</strong></td><td><span class="mono">lib/server/storage/index.js</span></td><td>provider বাছাই · <span class="mono">storageKeyFromUrl</span></td></tr>
+  <tr><td><span class="mono">…/imageValidation.js</span></td><td>MIME, ৩ MB, key গঠন, traversal guard (pure)</td></tr>
+  <tr><td><span class="mono">app/api/v1/uploads/product-image/route.js</span></td><td>multipart → validate → putObject</td></tr>
+
+  <tr><td><strong>Marketplace</strong></td><td><span class="mono">app/marketplace/page.js</span></td><td>filter, search, product card</td></tr>
+  <tr><td><strong>Traceability</strong></td><td><span class="mono">app/api/v1/trace/[productId]/route.js</span></td><td>ownership check · ছয় ধাপ · <span class="mono">ledger_type</span></td></tr>
+  <tr><td><strong>Cart</strong></td><td><span class="mono">app/api/v1/cart/[userId]/**</span> · <span class="mono">components/cart/useCart.js</span></td><td>upsert, quantity যোগ, ownership</td></tr>
+  <tr><td><strong>Checkout</strong></td><td><span class="mono">app/api/v1/orders/[id]/checkout/route.js</span></td><td><span class="mono">$transaction</span> — পাঁচটি কাজ</td></tr>
+  <tr><td><strong>Order status</strong></td><td><span class="mono">app/api/v1/orders/[id]/status/route.js</span></td><td>farmer/admin যাচাই · event · reputation</td></tr>
+  <tr><td rowspan="2"><strong>Review</strong></td><td><span class="mono">lib/server/reviews.js</span> + <span class="mono">reviewEligibility.js</span></td><td>DELIVERED যাচাই (pure অংশ আলাদা)</td></tr>
+  <tr><td><span class="mono">app/api/v1/reviews/route.js</span></td><td>CONSUMER only · eligibility · reputation</td></tr>
+  <tr><td><strong>Wishlist</strong></td><td><span class="mono">app/api/v1/wishlist/**</span></td><td>সবসময় session-এর userId</td></tr>
+  <tr><td><strong>Rewards</strong></td><td><span class="mono">lib/server/serializers.js</span> → <span class="mono">toPublicRewards</span></td><td>ledger যোগ, badge, distinct days</td></tr>
+  <tr><td><strong>Admin</strong></td><td><span class="mono">app/api/v1/admin/**</span> · <span class="mono">app/admin/**</span></td><td>১৩টি endpoint · ৮টি পেজ</td></tr>
+  <tr><td><strong>Audit log</strong></td><td><span class="mono">lib/server/audit.js</span></td><td>try/catch — কখনো request ব্যর্থ করে না</td></tr>
+  <tr><td><strong>Rate limiting</strong></td><td><span class="mono">lib/server/rateLimit.js</span></td><td>sliding window, IP-ভিত্তিক</td></tr>
+  <tr><td><strong>Masking</strong></td><td><span class="mono">lib/server/mask.js</span></td><td>শেষ ৪ অক্ষর ছাড়া সব লুকানো</td></tr>
+  <tr><td><strong>Error handling</strong></td><td><span class="mono">lib/server/respond.js</span> · <span class="mono">apiError.js</span></td><td><span class="mono">ok</span>, <span class="mono">fail</span>, <span class="mono">handleRoute</span></td></tr>
+  <tr><td><strong>Serializers</strong></td><td><span class="mono">lib/server/serializers.js</span></td><td>১০টি ফাংশন — API-র আকার এখানেই ঠিক হয়</td></tr>
+  <tr><td><strong>Database</strong></td><td><span class="mono">prisma/schema.prisma</span> · <span class="mono">migrations/</span> · <span class="mono">seed.mjs</span></td><td>মডেল, enum, SQL, ডেমো ডেটা</td></tr>
+  <tr><td><strong>Frontend API client</strong></td><td><span class="mono">lib/api.js</span></td><td>একটি <span class="mono">request()</span> + ৫০+ helper</td></tr>
+  <tr><td><strong>SDK</strong></td><td><span class="mono">fair-harvest-sdk/src/index.js</span></td><td><span class="mono">FairHarvestClient</span> class</td></tr>
+  <tr><td><strong>i18n</strong></td><td><span class="mono">components/i18n/</span> · <span class="mono">lib/i18nDictionary.js</span></td><td>DOM walker + ১৭৭টি স্ট্রিং</td></tr>
+  <tr><td><strong>CORS</strong></td><td><span class="mono">middleware.js</span></td><td>allow-list, wildcard নেই</td></tr>
+  <tr><td><strong>Tests</strong></td><td><span class="mono">test/*.test.js</span> · <span class="mono">../fair-harvest-sdk/test/</span></td><td>২৬ + ৫</td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch50"><span class="num">50</span>Screenshot ও Diagram তালিকা<span class="mk">[[C50]]</span></h1>
+
+<h2>50.1 ব্যবহৃত ২৯টি screenshot</h2>
+<p>প্রতিটি screenshot এই ডকুমেন্ট তৈরির সময় <strong>চালু অ্যাপ</strong> থেকে নেওয়া (PostgreSQL ডাটাবেস,
+seed করা ডেটা, Chromium ১৪৪০px ও মোবাইলের জন্য ৩৯০px)। কোনোটিই কল্পিত নয়।</p>
+<table class="data tight">
+  <tr><th class="c" style="width:7%">চিত্র</th><th style="width:28%">পেজ</th><th style="width:16%">কোন রোল</th><th>কী দেখায়</th></tr>
+  <tr><td class="c">1</td><td><span class="mono">/</span></td><td>public</td><td>হোমপেজ ও cockpit</td></tr>
+  <tr><td class="c">4</td><td><span class="mono">/auth</span></td><td>public</td><td>রোল বাছাই</td></tr>
+  <tr><td class="c">6</td><td><span class="mono">/auth/customer</span></td><td>public</td><td>ক্রেতার login</td></tr>
+  <tr><td class="c">8</td><td><span class="mono">/farmer/verify</span></td><td>farmer (pending)</td><td>Farmer Card ফর্ম</td></tr>
+  <tr><td class="c">9</td><td><span class="mono">/admin/verification</span></td><td>admin</td><td>pending queue, masked card</td></tr>
+  <tr><td class="c">12</td><td><span class="mono">/farmers/[id]</span></td><td>public</td><td>কৃষকের public profile</td></tr>
+  <tr><td class="c">13</td><td><span class="mono">/admin/products</span></td><td>admin</td><td>search, filter, archive/restore</td></tr>
+  <tr><td class="c">16</td><td><span class="mono">/marketplace</span></td><td>public</td><td>filter ও product card</td></tr>
+  <tr><td class="c">17</td><td><span class="mono">/marketplace/[id]</span></td><td>consumer</td><td>বিস্তারিত + review</td></tr>
+  <tr><td class="c">18</td><td><span class="mono">/marketplace</span> (৩৯০px)</td><td>public</td><td>মোবাইল layout</td></tr>
+  <tr><td class="c">19</td><td><span class="mono">/trace/[id]</span></td><td>public</td><td>ছয় ধাপের timeline</td></tr>
+  <tr><td class="c">20</td><td><span class="mono">/cart</span></td><td>consumer</td><td>cart ও subtotal</td></tr>
+  <tr><td class="c">21</td><td><span class="mono">/checkout</span></td><td>consumer</td><td>ঠিকানা ও demo payment</td></tr>
+  <tr><td class="c">23</td><td><span class="mono">/orders/[id]</span></td><td>consumer</td><td>order বিবরণ ও timeline</td></tr>
+  <tr><td class="c">24</td><td><span class="mono">/admin/orders</span></td><td>admin</td><td>status drop-down</td></tr>
+  <tr><td class="c">25</td><td><span class="mono">/admin/reviews</span></td><td>admin</td><td>moderation</td></tr>
+  <tr><td class="c">26</td><td><span class="mono">/wishlist</span></td><td>consumer</td><td>সংরক্ষিত পণ্য</td></tr>
+  <tr><td class="c">27</td><td><span class="mono">/rewards</span></td><td>consumer</td><td>পয়েন্ট ও badge</td></tr>
+  <tr><td class="c">28</td><td><span class="mono">/farmer/dashboard</span></td><td>farmer (verified)</td><td>সম্পূর্ণ dashboard</td></tr>
+  <tr><td class="c">29</td><td><span class="mono">/farmer/dashboard</span></td><td>farmer (pending)</td><td>verification lock</td></tr>
+  <tr><td class="c">30</td><td><span class="mono">/account</span></td><td>consumer</td><td>ক্রেতার dashboard</td></tr>
+  <tr><td class="c">31</td><td><span class="mono">/orders</span></td><td>consumer</td><td>order history</td></tr>
+  <tr><td class="c">32</td><td><span class="mono">/admin/dashboard</span></td><td>admin</td><td>৬টি metric</td></tr>
+  <tr><td class="c">33</td><td><span class="mono">/admin/farmers</span></td><td>admin</td><td>suspend/reinstate</td></tr>
+  <tr><td class="c">34</td><td><span class="mono">/admin/customers</span></td><td>admin</td><td>ক্রেতা ব্যবস্থাপনা</td></tr>
+  <tr><td class="c">35</td><td><span class="mono">/admin/audit-log</span></td><td>admin</td><td>৫টি প্রকৃত audit entry</td></tr>
+</table>
+<p class="caption">এছাড়া <span class="mono">/auth/farmer</span> ও <span class="mono">/admin/login</span>-এর
+screenshotও নেওয়া হয়েছে, যা <span class="mono">/auth/customer</span>-এর মতোই দেখতে (একই AuthForm)।</p>
+
+<h2>50.2 তৈরি করা ১১টি diagram</h2>
+<table class="data tight">
+  <tr><th class="c" style="width:7%">চিত্র</th><th style="width:34%">Diagram</th><th>কী বোঝায়</th></tr>
+  <tr><td class="c">2</td><td>System Architecture</td><td>client → Next.js স্তর → Prisma → PostgreSQL/Blob</td></tr>
+  <tr><td class="c">3</td><td>User Role Architecture</td><td>তিন রোল ও তাদের অনুমোদিত কাজ</td></tr>
+  <tr><td class="c">5</td><td>Authentication Sequence</td><td>login-এর ১২টি ধাপ</td></tr>
+  <tr><td class="c">7</td><td>Farmer Verification Flow</td><td>instant ও manual — দুটি পথ</td></tr>
+  <tr><td class="c">10</td><td>Farmer Card Decision Tree</td><td>পাঁচটি ক্ষেত্র ও তাদের ফলাফল</td></tr>
+  <tr><td class="c">11</td><td>Reputation Computation</td><td>তিনটি সংকেত → score → badge</td></tr>
+  <tr><td class="c">14</td><td>Product Lifecycle</td><td>ACTIVE ↔ OUT_OF_STOCK ↔ ARCHIVED</td></tr>
+  <tr><td class="c">15</td><td>Image Upload Flow</td><td>১০টি ধাপ, নিরাপত্তা যাচাই সহ</td></tr>
+  <tr><td class="c">22</td><td>Order Lifecycle</td><td>cart → checkout transaction → পাঁচটি status</td></tr>
+  <tr><td class="c">36</td><td>Database ERD</td><td>১৫টি মডেল ও ১৮টি সম্পর্ক</td></tr>
+  <tr><td class="c">37</td><td>Deployment Architecture</td><td>GitHub → Vercel → Neon + Blob</td></tr>
+</table>
+
+
+<h1 class="chapter" id="ch51"><span class="num">51</span>Feature Completeness Checklist<span class="mk">[[C51]]</span></h1>
+
+<p>নিরীক্ষার চূড়ান্ত যাচাই — প্রতিটি ফিচার কোডে আছে কি না, ডকুমেন্টে ব্যাখ্যা করা হয়েছে কি না,
+screenshot আছে কি না।</p>
+
+<table class="data tight">
+  <tr><th style="width:23%">ফিচার</th><th class="c" style="width:11%">কোডে আছে?</th><th class="c" style="width:11%">ডকুমেন্টেড</th><th class="c" style="width:10%">Screenshot</th><th class="c" style="width:9%">API</th><th class="c" style="width:9%">DB</th><th class="c" style="width:9%">ভাইভা প্রশ্ন</th><th>অধ্যায়</th></tr>
+  <tr><td>Authentication</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 6</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ১২–২০</td><td>8</td></tr>
+  <tr><td>Authorization</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ১৭, ১৮</td><td>9</td></tr>
+  <tr><td>Customer role</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 30</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>25</td></tr>
+  <tr><td>Farmer role</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 28</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>24</td></tr>
+  <tr><td>Admin role</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 32</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>26</td></tr>
+  <tr><td>Farmer verification</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 8, 9</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ২১–২৫</td><td>10</td></tr>
+  <tr><td>Gov Farmer Card</td><td class="c">✔ <span class="chip demo">demo</span></td><td class="c">✔</td><td class="c">✔ চিত্র 8</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ২২</td><td>11</td></tr>
+  <tr><td>Reputation / trust</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 12, 28</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ২৬–৩০</td><td>12</td></tr>
+  <tr><td>Product CRUD</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 13, 28</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>13</td></tr>
+  <tr><td>Product image</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 13, 16</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ১১</td><td>15</td></tr>
+  <tr><td>Product status</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 13</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৩৫</td><td>14</td></tr>
+  <tr><td>Archive (soft delete)</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 13</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৩১, ৩২</td><td>14</td></tr>
+  <tr><td>Restore</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 13</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৩৩</td><td>14</td></tr>
+  <tr><td>Marketplace</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 16, 18</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>16</td></tr>
+  <tr><td>Cart</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 20</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৩৬</td><td>18</td></tr>
+  <tr><td>Checkout</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 21</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৩৮, ৩৯</td><td>19</td></tr>
+  <tr><td>Payment</td><td class="c">✔ <span class="chip demo">demo</span></td><td class="c">✔</td><td class="c">✔ চিত্র 21</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৪০</td><td>19</td></tr>
+  <tr><td>Order + status</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 23, 24</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৪১, ৪২</td><td>20</td></tr>
+  <tr><td>Traceability</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 19</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>17</td></tr>
+  <tr><td>Reviews</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 17, 25</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৪৩–৪৫</td><td>21</td></tr>
+  <tr><td>Wishlist</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 26</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>22</td></tr>
+  <tr><td>Rewards</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 27</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>23</td></tr>
+  <tr><td>Audit log</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 35</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৪৯</td><td>27</td></tr>
+  <tr><td>Rate limiting</td><td class="c">✔ <span class="chip part">in-mem</span></td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">—</td><td class="c">প্র ৫৪</td><td>28</td></tr>
+  <tr><td>Masking (NID/card)</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 9, 12</td><td class="c">✔</td><td class="c">—</td><td class="c">প্র ৫৫</td><td>28</td></tr>
+  <tr><td>PostgreSQL</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td class="c">প্র ৭</td><td>29</td></tr>
+  <tr><td>Prisma</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td class="c">প্র ৬</td><td>30</td></tr>
+  <tr><td>Migration</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td class="c">প্র ৫০</td><td>30</td></tr>
+  <tr><td>Seed</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td class="c">প্র ৫১</td><td>30</td></tr>
+  <tr><td>REST API (৬৪)</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔</td><td>31</td></tr>
+  <tr><td>Vercel deploy</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">প্র ৫৭, ৫৮</td><td>39</td></tr>
+  <tr><td>Neon</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td class="c">প্র ৫৯</td><td>39</td></tr>
+  <tr><td>Vercel Blob</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">—</td><td class="c">প্র ১১</td><td>15</td></tr>
+  <tr><td>Environment vars</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td>40</td></tr>
+  <tr><td>Security</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">✔</td><td class="c">প্র ৫২–৫৫</td><td>28</td></tr>
+  <tr><td>Testing</td><td class="c">✔ ৩১টি</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">প্র ৫৬</td><td>38</td></tr>
+  <tr><td>Error handling</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td>37</td></tr>
+  <tr><td>i18n (বাংলা)</td><td class="c">✔ <span class="chip part">১৭৭</span></td><td class="c">✔</td><td class="c">✔ চিত্র 16</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td>35</td></tr>
+  <tr><td>SDK প্যাকেজ</td><td class="c">✔</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td class="c">—</td><td class="c">✔</td><td>35</td></tr>
+  <tr><td>Demo মডিউল তালিকা</td><td class="c">✔</td><td class="c">✔</td><td class="c">✔ চিত্র 1, 28</td><td class="c">✔</td><td class="c">—</td><td class="c">প্র ৬২</td><td>36</td></tr>
+  <tr><td>Limitations</td><td class="c">—</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">প্র ৬০</td><td>41</td></tr>
+  <tr><td>Future scope</td><td class="c">—</td><td class="c">✔</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">✔</td><td>42</td></tr>
+</table>
+
+<div class="box ok">
+  <span class="boxTitle">নিরীক্ষার ফল</span>
+  <p>Repository-তে পাওয়া প্রতিটি মডিউল এই ডকুমেন্টে ব্যাখ্যা করা হয়েছে। যেগুলোর জন্য কোনো
+  দৃশ্যমান UI নেই (rate limiting, masking, migration, testing) সেগুলোর screenshot নেই, তবে কোড উদ্ধৃতি
+  ও ব্যাখ্যা আছে। কোনো ফিচার বাদ পড়েনি এবং কোনো অস্তিত্বহীন ফিচার যোগ করা হয়নি।</p>
+</div>
+
+
+<h1 class="chapter" id="ch52"><span class="num">52</span>শেষ মুহূর্তের চিট শিট (১ পৃষ্ঠা)<span class="mk">[[C52]]</span></h1>
+
+<div class="box ok" style="font-size:9.6pt">
+  <span class="boxTitle" style="font-size:11pt">৩০ সেকেন্ডের উত্তর</span>
+  <p>“Fair Harvest একটি full-stack digital agricultural marketplace, যেখানে সরকারি Farmer Card দিয়ে
+  verified কৃষকরা সরাসরি ক্রেতাদের কাছে বিক্রি করতে পারেন। তিনটি মূল বৈশিষ্ট্য — farmer verification,
+  স্বয়ংক্রিয় reputation score, আর soil-to-plate traceability। Next.js, React, Prisma, PostgreSQL,
+  Vercel-এ deploy করা।”</p>
+</div>
+
+<table class="data tight" style="margin-top:8px">
+  <tr><th style="width:22%">বিষয়</th><th>মনে রাখার কথা</th></tr>
+  <tr><td><strong>স্ট্যাক</strong></td><td>Next.js 15 · React 19 · Prisma 6.19.3 · PostgreSQL (Neon) · JWT HS256 · Zod · bcryptjs · Vercel + Blob</td></tr>
+  <tr><td><strong>সংখ্যা</strong></td><td>৬৪ API method · ৫৪ route ফাইল · ১৫ মডেল · ১৩ enum · ১৮ FK · ৩১ test · ০ lint error</td></tr>
+  <tr><td><strong>রোল</strong></td><td>CONSUMER · FARMER · ADMIN — তিনটি আলাদা login দরজা, admin self-register করতে পারে না</td></tr>
+  <tr><td><strong>Verification</strong></td><td>Card + NID + নাম → <span class="mono">GovFarmerCardRecord</span> → মিললে instant VERIFIED, নাহলে admin queue</td></tr>
+  <tr><td><strong>মূল নিয়ম</strong></td><td><span class="mono">verificationStatus !== "VERIFIED"</span> → পণ্য বা ছবি — কিছুই দেওয়া যাবে না (403)</td></tr>
+  <tr><td><strong>Reputation</strong></td><td><strong>0.35 × ver + 0.40 × review + 0.25 × delivery</strong> · Rahim = 90×.35 + 100×.40 + 100×.25 = <strong>97</strong></td></tr>
+  <tr><td><strong>Badge</strong></td><td>≥90 Trusted · ≥75 Reliable · ≥55 Growing · &lt;55 New</td></tr>
+  <tr><td><strong>Soft delete</strong></td><td>DELETE = <span class="mono">status: ARCHIVED</span>; কারণ <span class="mono">OrderItem → Product</span> RESTRICT</td></tr>
+  <tr><td><strong>Checkout</strong></td><td>একটি <span class="mono">$transaction</span>-এ — Order+Items · stock− · Payment · +20 point · cart clear</td></tr>
+  <tr><td><strong>Review</strong></td><td>DELIVERED order item লাগে · দুটি unique constraint · moderation = hide, মুছে ফেলা নয়</td></tr>
+  <tr><td><strong>Trace</strong></td><td>৬ ধাপ · অসম্পূর্ণ ধাপে কোনো বানানো তারিখ নেই · <span class="mono">ledger_type: "database"</span></td></tr>
+  <tr><td><strong>Security</strong></td><td>bcrypt 10 · JWT 2h · requireUser/Role/OwnerOrRole · Zod · rate limit ৫টি · masking · CORS allow-list</td></tr>
+  <tr><td><strong>Storage</strong></td><td>JPG/PNG/WebP · ৩ MB · SVG নিষিদ্ধ · key = <span class="mono">products/&lt;uuid&gt;.ext</span> · DB-তে শুধু URL</td></tr>
+  <tr><td><strong>Audit</strong></td><td>৬ ধরনের কাজ · কোনো FK নেই (ইচ্ছাকৃত) · কখনো request ব্যর্থ করে না</td></tr>
+  <tr><td><strong>Deploy</strong></td><td>build = <span class="mono">prisma generate &amp;&amp; prisma migrate deploy &amp;&amp; next build</span> · main = production</td></tr>
+  <tr><td><strong>দুটি DB URL</strong></td><td><span class="mono">DATABASE_URL</span> pooled (runtime) · <span class="mono">DIRECT_URL</span> direct (migration)</td></tr>
+</table>
+
+<div class="box bad" style="margin-top:8px">
+  <span class="boxTitle">যা সৎভাবে স্বীকার করবেন (জিজ্ঞেস করলেই)</span>
+  <p><strong>Payment demo</strong> · <strong>Gov API demo registry</strong> · <strong>rate limit in-memory</strong> ·
+  scanner/nutrition/health/DNA/soil/waste = heuristic, AI নয় · voice = canned transcript ·
+  notification নেই · pagination নেই · profile edit নেই · integration test নেই ·
+  marketplace search client-side · blockchain নেই (API নিজেই বলে দেয়)।</p>
+</div>
+
+<div class="box info" style="margin-top:8px">
+  <span class="boxTitle">ডেমো দেখানোর ক্রম (৩ মিনিট)</span>
+  <p>১. <span class="mono">/marketplace</span> — trust score ও filter দেখান।
+  ২. একটি পণ্যে ঢুকে <span class="mono">/trace</span> — ছয় ধাপ ও “database, not blockchain” নোট।
+  ৩. Karim (pending) হিসেবে login — dashboard locked।
+  ৪. Rahim (verified) হিসেবে login — reputation 97, পণ্য যোগের ফর্ম আছে।
+  ৫. Admin → verification queue → audit log।</p>
+</div>
+
+<p style="text-align:center;margin-top:14px;color:#5a6b62;font-size:9pt">
+— ডকুমেন্ট শেষ · Fair Harvest Defense Handbook v1.0 —</p>

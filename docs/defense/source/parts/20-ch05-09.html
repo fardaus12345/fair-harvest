@@ -1,0 +1,356 @@
+<!--PART:ভাগ খ — আর্কিটেকচার, প্রযুক্তি ও নিরাপত্তা-->
+<h1 class="chapter" id="ch5"><span class="num">5</span>সিস্টেম আর্কিটেকচার<span class="mk">[[C5]]</span></h1>
+
+<h2>5.1 এক কথায় আর্কিটেকচারটি কেমন?</h2>
+<p>Fair Harvest একটি <strong>monolithic full-stack Next.js application</strong>। অর্থাৎ frontend ও backend
+আলাদা দুটি প্রজেক্ট নয় — একটিই deployment, যেখানে একই server একদিকে HTML/React পাঠায়, অন্যদিকে
+<span class="mono">/api/v1/**</span>-এ REST API উত্তর দেয়।</p>
+
+<figure class="wide">
+  <img src="diagrams/d1-architecture.svg" alt="System architecture">
+  <figcaption class="caption">চিত্র 2: Fair Harvest-এর সম্পূর্ণ সিস্টেম আর্কিটেকচার — ক্লায়েন্ট, অ্যাপ্লিকেশন স্তর এবং ডেটা স্তর।</figcaption>
+</figure>
+
+<h2>5.2 স্তরগুলো কী কী?</h2>
+<table class="data">
+  <tr><th style="width:20%">স্তর (Layer)</th><th style="width:36%">কাজ</th><th>প্রধান ফাইল</th></tr>
+  <tr><td><strong>Client</strong></td><td>ব্যবহারকারী যা দেখেন ও ক্লিক করেন। JWT token এখানে
+      <span class="mono">localStorage</span>-এ থাকে।</td>
+      <td><span class="mono">app/**/page.js</span>, <span class="mono">components/**</span></td></tr>
+  <tr><td><strong>Routing / Middleware</strong></td><td>API-এর জন্য CORS নিয়ন্ত্রণ। default অবস্থায়
+      শুধু same-origin অনুমোদিত, কোনো wildcard নেই।</td>
+      <td><span class="mono">middleware.js</span></td></tr>
+  <tr><td><strong>Route Handlers (API)</strong></td><td>প্রতিটি REST endpoint। HTTP method অনুযায়ী
+      <span class="mono">GET/POST/PATCH/DELETE</span> function export করা হয়।</td>
+      <td><span class="mono">app/api/v1/**/route.js</span></td></tr>
+  <tr><td><strong>Auth layer</strong></td><td>টোকেন পড়া, ব্যবহারকারী শনাক্ত করা, রোল ও মালিকানা যাচাই।</td>
+      <td><span class="mono">lib/server/auth.js</span></td></tr>
+  <tr><td><strong>Business logic</strong></td><td>Reputation গণনা, review eligibility, earnings সারাংশ,
+      API response-এর আকার নির্ধারণ।</td>
+      <td><span class="mono">lib/server/reputation.js</span>, <span class="mono">reviews.js</span>,
+      <span class="mono">earnings.js</span>, <span class="mono">serializers.js</span></td></tr>
+  <tr><td><strong>Cross-cutting</strong></td><td>সব route-এ লাগে এমন জিনিস: rate limit, audit log,
+      Zod validation, identifier masking, একক error format।</td>
+      <td><span class="mono">rateLimit.js</span>, <span class="mono">audit.js</span>,
+      <span class="mono">respond.js</span>, <span class="mono">mask.js</span></td></tr>
+  <tr><td><strong>Data</strong></td><td>Prisma Client দিয়ে PostgreSQL-এ query; ছবি Vercel Blob-এ।</td>
+      <td><span class="mono">lib/server/db.js</span>, <span class="mono">prisma/schema.prisma</span>,
+      <span class="mono">lib/server/storage/</span></td></tr>
+</table>
+
+<h2>5.3 দুটি গুরুত্বপূর্ণ ডিজাইন সিদ্ধান্ত</h2>
+
+<h3>(ক) Provider Abstraction — একই নকশা দুই জায়গায়</h3>
+<p>দুটি জায়গায় একই প্যাটার্ন ব্যবহার করা হয়েছে: একটি <span class="mono">index.js</span> ঠিক করে দেয়
+কোন provider ব্যবহার হবে, আর route handler কখনো জানেই না ভিতরে কোনটা চলছে।</p>
+<pre>lib/server/verification/index.js      lib/server/storage/index.js
+  ├─ demoRegistryProvider.js            ├─ localDiskProvider.js   (dev)
+  └─ officialGovApiProvider.js          └─ objectStorageProvider.js (Vercel Blob)
+     ↑ VERIFICATION_PROVIDER               ↑ STORAGE_PROVIDER</pre>
+<p><strong>লাভ কী?</strong> ভবিষ্যতে সত্যিকারের সরকারি API এলে শুধু একটি ফাইল বদলাতে হবে — route,
+database schema বা frontend-এর একটি লাইনও বদলাবে না। একই ভাবে local disk থেকে Vercel Blob-এ যেতে
+শুধু একটি environment variable বদলাতে হয়েছে।</p>
+
+<h3>(খ) Pure Function — যাতে টেস্ট করা যায়</h3>
+<p>যেসব logic-এ database লাগে না, সেগুলো আলাদা <em>pure</em> ফাইলে রাখা হয়েছে —
+<span class="mono">reputation.js</span>, <span class="mono">reviewEligibility.js</span>,
+<span class="mono">earnings.js</span>, <span class="mono">imageValidation.js</span>,
+<span class="mono">mask.js</span>, <span class="mono">rateLimit.js</span>। এতে
+<span class="mono">node --test</span> দিয়ে database বা Next.js runtime ছাড়াই ২৬টি unit test চালানো যায়
+(অধ্যায় 38)।</p>
+
+<div class="box info">
+  <span class="boxTitle">ভাইভা টিপ</span>
+  <p>যদি জিজ্ঞেস করে “আপনার architecture কি microservice?” — উত্তর: “না, এটি ইচ্ছাকৃতভাবে monolith।
+  একজন ডেভেলপারের university project-এ microservice মানে অপ্রয়োজনীয় জটিলতা। তবে কোডের ভিতরে
+  স্তর (layer) আলাদা রাখা হয়েছে, আর provider abstraction দিয়ে বাইরের নির্ভরতাগুলো পাল্টানোর পথ খোলা
+  রাখা হয়েছে।”</p>
+</div>
+
+
+<h1 class="chapter" id="ch6"><span class="num">6</span>টেকনোলজি স্ট্যাক<span class="mk">[[C6]]</span></h1>
+
+<p>নিচের প্রতিটি প্যাকেজ <span class="mono">fair-harvest-web/package.json</span>-এ সত্যিই আছে।</p>
+
+<table class="data">
+  <tr><th style="width:20%">প্রযুক্তি</th><th class="c" style="width:10%">সংস্করণ</th><th style="width:30%">কাজ কী</th><th>কেন এটি বেছে নেওয়া হলো</th></tr>
+  <tr><td><strong>Next.js</strong> (App Router)</td><td class="c">^15.1.4</td>
+      <td>Frontend render + backend API route — দুটোই</td>
+      <td>একটি প্রজেক্টেই full-stack; Vercel-এ deploy সবচেয়ে সহজ; Server Component-এ সরাসরি database পড়া যায়</td></tr>
+  <tr><td><strong>React</strong></td><td class="c">^19.0.0</td><td>UI component ও state</td>
+      <td>Next.js-এর ভিত্তি; component পুনর্ব্যবহার সহজ</td></tr>
+  <tr><td><strong>Prisma ORM</strong></td><td class="c">6.19.3</td><td>Database schema, migration ও type-safe query</td>
+      <td>হাতে SQL না লিখে মডেল দিয়ে কাজ; migration স্বয়ংক্রিয়; SQL injection-এর ঝুঁকি কমে</td></tr>
+  <tr><td><strong>PostgreSQL</strong> (Neon)</td><td class="c">—</td><td>মূল ডাটাবেস</td>
+      <td>relational data, enum, foreign key, transaction — সবই দরকার ছিল; Neon serverless ও free tier আছে</td></tr>
+  <tr><td><strong>jsonwebtoken</strong></td><td class="c">^9.0.3</td><td>JWT তৈরি ও যাচাই (HS256)</td>
+      <td>stateless auth — server-এ session টেবিল রাখতে হয় না, serverless-এ উপযুক্ত</td></tr>
+  <tr><td><strong>bcryptjs</strong></td><td class="c">^3.0.3</td><td>পাসওয়ার্ড hash (cost 10)</td>
+      <td>পাসওয়ার্ড কখনো plain text-এ রাখা হয় না; bcrypt ইচ্ছাকৃতভাবে ধীর, তাই brute-force কঠিন</td></tr>
+  <tr><td><strong>Zod</strong></td><td class="c">^4.5.4</td><td>API input validation</td>
+      <td>প্রতিটি route-এ আসা JSON-এর আকার ও ধরন যাচাই; ভুল হলে 422</td></tr>
+  <tr><td><strong>@vercel/blob</strong></td><td class="c">^2.8.0</td><td>পণ্যের ছবি সংরক্ষণ (production)</td>
+      <td>serverless filesystem read-only, তাই ছবি ডিস্কে রাখা যায় না</td></tr>
+  <tr><td><strong>lucide-react</strong></td><td class="c">^0.468.0</td><td>আইকন</td><td>হালকা, tree-shakeable SVG আইকন সেট</td></tr>
+  <tr><td><strong>ESLint</strong> + eslint-config-next</td><td class="c">^9.17.0</td><td>কোডের মান পরীক্ষা</td><td>ভুল ধরা পড়ে commit করার আগেই</td></tr>
+  <tr><td><strong>@fair-harvest/sdk</strong></td><td class="c">0.1.0</td><td>নিজের লেখা REST client (আলাদা প্যাকেজ)</td>
+      <td>ভবিষ্যতের mobile app বা third-party integration-এর জন্য একটি পরিষ্কার contract</td></tr>
+  <tr><td><strong>node:test</strong></td><td class="c">Node 22</td><td>Unit test runner</td><td>বাড়তি test framework install না করেই টেস্ট চালানো যায়</td></tr>
+</table>
+
+<h2>6.1 প্রজেক্টের ফোল্ডার কাঠামো</h2>
+<pre>fair-harvest/
+├── fair-harvest-web/            ← মূল Next.js application
+│   ├── app/                     ← App Router: পেজ + API route
+│   │   ├── api/v1/**/route.js   ← সব REST endpoint (backend)
+│   │   ├── admin/               ← admin console পেজ
+│   │   ├── farmer/              ← farmer dashboard ও verification
+│   │   ├── marketplace/  cart/  checkout/  orders/  account/
+│   │   ├── layout.js  page.js  globals.css
+│   ├── components/              ← পুনর্ব্যবহারযোগ্য React component
+│   ├── lib/
+│   │   ├── api.js               ← frontend → API কল করার helper
+│   │   └── server/              ← backend-only logic (auth, reputation, storage…)
+│   ├── prisma/
+│   │   ├── schema.prisma        ← ডাটাবেস মডেল (single source of truth)
+│   │   ├── migrations/          ← SQL migration ইতিহাস
+│   │   └── seed.mjs             ← ডেমো ডেটা
+│   ├── middleware.js            ← CORS
+│   └── test/                    ← ২৬টি unit test
+└── fair-harvest-sdk/            ← আলাদা npm প্যাকেজ (REST client + ৫টি test)</pre>
+
+
+<h1 class="chapter" id="ch7"><span class="num">7</span>ইউজার রোল ও পারমিশন<span class="mk">[[C7]]</span></h1>
+
+<figure class="wide">
+  <img src="diagrams/d2-roles.svg" alt="User roles">
+  <figcaption class="caption">চিত্র 3: তিনটি রোল এবং প্রতিটির অনুমোদিত কাজ।</figcaption>
+</figure>
+
+<h2>7.1 রোল, দায়িত্ব ও অনুমোদিত ফিচার</h2>
+<table class="data tight">
+  <tr><th style="width:13%">রোল</th><th style="width:26%">দায়িত্ব</th><th style="width:33%">যা করতে পারে</th><th>যা করতে পারে না (server 403 দেয়)</th></tr>
+  <tr>
+    <td><strong>CONSUMER</strong><br>(ক্রেতা)</td>
+    <td>পণ্য কেনা, প্রাপ্ত পণ্যের সৎ মূল্যায়ন দেওয়া</td>
+    <td>Marketplace browse ও filter · product detail · cart-এ যোগ/পরিমাণ বদল/মুছে ফেলা · checkout ·
+        নিজের order ও timeline · DELIVERED পণ্যের review · wishlist · rewards · <span class="mono">/account</span></td>
+    <td>পণ্য তৈরি বা সম্পাদনা · অন্যের cart বা order দেখা · order status বদল · trace event যোগ ·
+        ছবি upload · <span class="mono">/api/v1/admin/*</span></td>
+  </tr>
+  <tr>
+    <td><strong>FARMER</strong><br>(কৃষক)</td>
+    <td>নিজের পণ্য ও তার ইতিহাস ব্যবস্থাপনা</td>
+    <td>Farmer Card verification · <em>verified হলে</em> পণ্য যোগ · নিজের পণ্য সম্পাদনা ও archive ·
+        ছবি upload · নিজের পণ্যে trace event · নিজের order item ও earnings · যে order-এ নিজের item আছে
+        তার status বদল</td>
+    <td>verified না হয়ে পণ্য তালিকাভুক্ত করা · অন্য কৃষকের পণ্য বদলানো · অন্য কৃষকের order item দেখা ·
+        review দেওয়া (শুধু CONSUMER পারে) · admin console</td>
+  </tr>
+  <tr>
+    <td><strong>ADMIN</strong><br>(প্রশাসক)</td>
+    <td>প্ল্যাটফর্মের তত্ত্বাবধান ও মান রক্ষা</td>
+    <td>Verification queue approve/reject · farmer ও customer account suspend/reinstate ·
+        যেকোনো পণ্য সম্পাদনা/archive/restore · সব order ও status · review hide/republish ·
+        audit log · platform metrics · যেকোনো cart/order দেখা</td>
+    <td>নিজে পণ্য বিক্রি করা (farmer profile নেই) · review দেওয়া · নিজে register করা
+        (admin account হাতে তৈরি করতে হয়)</td>
+  </tr>
+</table>
+
+<h2>7.2 প্রতিটি রোলের আলাদা দরজা (login page)</h2>
+<p>তিনটি রোলের জন্য তিনটি আলাদা login পেজ আছে, কিন্তু ভিতরে তিনটিই একই
+<span class="mono">POST /api/v1/auth/login</span> ব্যবহার করে। এই আলাদা করাটা শুধু UI-এর সুবিধা —
+নিরাপত্তার ভিত্তি নয়।</p>
+<table class="data">
+  <tr><th>পেজ</th><th>ফাইল</th><th>expectedRole</th><th>Register করা যায়?</th><th>সফল হলে যায়</th></tr>
+  <tr><td><span class="mono">/auth</span></td><td><span class="mono">app/auth/page.js</span></td><td>— (শুধু বাছাই)</td><td>—</td><td>তিনটি দরজার একটি</td></tr>
+  <tr><td><span class="mono">/auth/customer</span></td><td><span class="mono">app/auth/customer/page.js</span></td><td><span class="mono">consumer</span></td><td>হ্যাঁ</td><td><span class="mono">/account</span></td></tr>
+  <tr><td><span class="mono">/auth/farmer</span></td><td><span class="mono">app/auth/farmer/page.js</span></td><td><span class="mono">farmer</span></td><td>হ্যাঁ</td><td><span class="mono">/farmer/dashboard</span></td></tr>
+  <tr><td><span class="mono">/admin/login</span></td><td><span class="mono">app/admin/login/page.js</span></td><td><span class="mono">admin</span></td><td><strong>না</strong> (<span class="mono">allowRegister={false}</span>)</td><td><span class="mono">/admin/dashboard</span></td></tr>
+</table>
+
+<p><strong>ভুল দরজায় ঢুকলে কী হয়?</strong> ধরা যাক একজন farmer customer-এর পেজে সঠিক পাসওয়ার্ড দিলেন।
+Server token দিয়ে দেবে, কিন্তু <span class="mono">AuthForm.js</span> দেখবে
+<span class="mono">user.role !== expectedRole</span> — তখন সে session সংরক্ষণই করবে না, বরং বার্তা দেবে:
+<em>“This is a farmer account. Please use the farmer login at /auth/farmer …”</em></p>
+
+<figure class="wide">
+  <img src="shots/06-auth-chooser" alt="Role chooser page">
+  <figcaption class="caption">চিত্র 4: <span class="mono">/auth</span> — রোল বাছাইয়ের পেজ, যেখান থেকে তিনটি আলাদা login-এ যাওয়া যায়।</figcaption>
+</figure>
+
+<h2>7.3 RoleGuard — UI-স্তরের পাহারা</h2>
+<p><span class="mono">components/RoleGuard.js</span> একটি client component যা
+<span class="mono">/account</span>, <span class="mono">/farmer/**</span> ও <span class="mono">/admin/**</span>
+layout-এ মোড়ানো আছে। এটি দেখে ব্যবহারকারী login করা আছে কি না এবং রোল ঠিক আছে কি না; না হলে সঠিক
+জায়গায় পাঠিয়ে দেয়।</p>
+<div class="box warn">
+  <span class="boxTitle">খুব গুরুত্বপূর্ণ (ভাইভায় প্রায়ই জিজ্ঞেস করা হয়)</span>
+  <p>RoleGuard <strong>নিরাপত্তা নয়</strong> — এটি শুধু ব্যবহারকারীর সুবিধা। কেউ browser-এর
+  JavaScript বন্ধ করে বা সরাসরি API-তে request পাঠিয়ে এটি এড়াতে পারে। আসল নিরাপত্তা আছে server-এ:
+  প্রতিটি protected route <span class="mono">requireUser</span> / <span class="mono">requireRole</span> /
+  <span class="mono">requireOwnerOrRole</span> দিয়ে নিজেই যাচাই করে। কোডের কমেন্টেও এই কথাটি স্পষ্ট
+  লেখা আছে।</p>
+</div>
+
+
+<h1 class="chapter" id="ch8"><span class="num">8</span>Authentication — ব্যবহারকারী আসলেই কে, তা যাচাই<span class="mk">[[C8]]</span></h1>
+
+<h2>8.1 শব্দ দুটি আগে পরিষ্কার করে নিই</h2>
+<table class="data">
+  <tr><th style="width:24%">English term</th><th style="width:30%">সহজ বাংলা অর্থ</th><th>Fair Harvest-এ কোথায়</th></tr>
+  <tr><td><strong>Authentication</strong></td><td>“তুমি কি সত্যিই সেই লোক?” — পরিচয় প্রমাণ করা</td>
+      <td><span class="mono">POST /auth/login</span> → পাসওয়ার্ড মিলিয়ে JWT দেওয়া</td></tr>
+  <tr><td><strong>Authorization</strong></td><td>“তোমার এটা করার অনুমতি আছে কি?” — অধিকার যাচাই</td>
+      <td><span class="mono">requireRole</span>, <span class="mono">requireOwnerOrRole</span> (অধ্যায় 9)</td></tr>
+</table>
+
+<h2>8.2 JWT কী? (সহজ ব্যাখ্যা)</h2>
+<p><strong>JWT (JSON Web Token)</strong> — একে ভাবুন একটি <em>সিল করা পরিচয়পত্র</em>। ভিতরে লেখা থাকে
+আপনি কে (<span class="mono">sub</span> = user id), আপনার রোল কী, ইমেইল কী, আর কতক্ষণ পর্যন্ত বৈধ
+(<span class="mono">exp</span>)। এর গায়ে server তার গোপন চাবি (<span class="mono">JWT_SECRET</span>)
+দিয়ে একটি signature বসায়। কেউ ভিতরের লেখা এক অক্ষর বদলালে signature আর মেলে না, তাই server সঙ্গে
+সঙ্গে বুঝে ফেলে।</p>
+<pre>// lib/server/auth.js
+export function signToken(user) {
+  return jwt.sign({ sub: user.id, role: user.role, email: user.email },
+                  JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });   // default "2h"
+}</pre>
+<p><strong>Stateless</strong> মানে — server-এ কোনো session টেবিল রাখতে হয় না। token নিজেই সব তথ্য বহন
+করে। Vercel-এর মতো serverless পরিবেশে এটিই সবচেয়ে উপযুক্ত, কারণ প্রতিটি request আলাদা function
+instance-এ চলতে পারে।</p>
+
+<h2>8.3 একজন কৃষক login করলে ভিতরে ঠিক কী কী ঘটে?</h2>
+<figure class="wide">
+  <img src="diagrams/d3-auth.svg" alt="Authentication sequence">
+  <figcaption class="caption">চিত্র 5: Login-এর ধাপে ধাপে sequence — browser থেকে JWT ফেরত আসা পর্যন্ত।</figcaption>
+</figure>
+
+<ol>
+  <li>কৃষক <span class="mono">/auth/farmer</span> পেজে email ও password লেখেন।</li>
+  <li><span class="mono">AuthForm.js</span> → <span class="mono">lib/api.js</span>-এর
+      <span class="mono">login()</span> → <span class="mono">POST /api/v1/auth/login</span>।</li>
+  <li>Route প্রথমেই <span class="mono">enforceRateLimit(request, "auth-login", { max: 10, windowMs: 60000 })</span>
+      চালায় — এক মিনিটে একই IP থেকে ১০ বারের বেশি চেষ্টা হলে <span class="mono">429</span>।</li>
+  <li>Zod <span class="mono">loginSchema</span> দিয়ে email ও password যাচাই; ভুল হলে <span class="mono">422</span>।</li>
+  <li><span class="mono">prisma.user.findUnique({ where: { email }, include: { farmerProfile: true } })</span>।</li>
+  <li>ব্যবহারকারী না থাকলে, বা <span class="mono">status === "SUSPENDED"</span> হলে —
+      <span class="mono">401 "Invalid email or password"</span>।
+      <span class="chip impl">লক্ষণীয়</span> বার্তাটি ইচ্ছাকৃতভাবে একই রাখা হয়েছে, যাতে আক্রমণকারী বুঝতে
+      না পারে ইমেইলটি আদৌ আছে কি না (<em>user enumeration</em> প্রতিরোধ)।</li>
+  <li><span class="mono">bcrypt.compare(password, user.passwordHash)</span> — পাসওয়ার্ড মেলানো হয়
+      hash-এর সাথে, কখনো plain text-এর সাথে নয়।</li>
+  <li>মিললে <span class="mono">signToken(user)</span> — HS256 JWT তৈরি।</li>
+  <li>Response: <span class="mono">{ success: true, data: { access_token, token, user }, message: "Logged in" }</span>।</li>
+  <li>Browser-এ <span class="mono">saveSession()</span> টোকেন ও user object
+      <span class="mono">localStorage</span>-এ রাখে এবং একটি custom event ছাড়ে, যাতে Navbar সাথে সাথে
+      নাম দেখায়।</li>
+  <li>এরপর প্রতিটি request-এ <span class="mono">lib/api.js</span> নিজে থেকেই
+      <span class="mono">Authorization: Bearer &lt;token&gt;</span> header যোগ করে দেয়।</li>
+</ol>
+
+<h2>8.4 Registration</h2>
+<p><span class="mono">POST /api/v1/auth/register</span> — rate limit ৬/মিনিট। Zod schema নাম, ইমেইল,
+কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড এবং <span class="mono">role ∈ {consumer, farmer}</span> চায়।
+<strong>admin এখানে অনুমোদিত নয়</strong> — অর্থাৎ কেউ নিজেকে admin বানিয়ে register করতে পারবে না।</p>
+<pre>role: z.enum(["consumer", "farmer"]).default("consumer")   // ADMIN তালিকায় নেই
+
+...(role === "farmer" ? { farmerProfile: { create: {} } } : {})
+// farmer হলে একই সাথে একটি খালি FarmerProfile তৈরি হয় → verificationStatus = PENDING</pre>
+<p>একই ইমেইল আগে থেকে থাকলে <span class="mono">409 "An account with this email already exists"</span>।</p>
+
+<h2>8.5 Logout ও টোকেনের মেয়াদ</h2>
+<ul>
+  <li><strong>Logout</strong> — <span class="mono">clearSession()</span> শুধু localStorage থেকে token ও
+      user মুছে দেয়। JWT stateless, তাই server-এ “বাতিল করা” বলে কিছু নেই।
+      <span class="chip part">সীমাবদ্ধতা</span> logout-এর পরেও token তার মেয়াদ (২ ঘণ্টা) শেষ না হওয়া
+      পর্যন্ত প্রযুক্তিগতভাবে বৈধ থাকে — কেউ যদি আগেই সেটি কপি করে নিত।</li>
+  <li><strong>মেয়াদ শেষ</strong> — <span class="mono">jwt.verify</span> ব্যর্থ হয়,
+      <span class="mono">decodeToken</span> <span class="mono">null</span> দেয়,
+      <span class="mono">requireUser</span> <span class="mono">401</span> ছোড়ে, আর
+      <span class="mono">lib/api.js</span> ৪০১ দেখে ব্যবহারকারীকে <span class="mono">/auth</span>-এ
+      পাঠিয়ে দেয়।</li>
+</ul>
+
+<h2>8.6 Production-এ একটি নিরাপত্তা-তালা</h2>
+<pre>if (process.env.NODE_ENV === "production" &amp;&amp; !process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is not set. Refusing to start in production …");
+}</pre>
+<p>Development-এ সুবিধার জন্য একটি ডিফল্ট secret আছে, কিন্তু production-এ
+<span class="mono">JWT_SECRET</span> না থাকলে অ্যাপটি <strong>চালুই হবে না</strong>। কারণ ডিফল্ট
+secret জানা থাকলে যে কেউ নিজের জন্য admin token বানিয়ে ফেলতে পারত।</p>
+
+<figure class="wide">
+  <img src="shots/07-customer-login" alt="Customer login page">
+  <figcaption class="caption">চিত্র 6: ক্রেতার login পেজ (<span class="mono">/auth/customer</span>) — একই form login ও registration দুটোতেই কাজ করে।</figcaption>
+</figure>
+
+
+<h1 class="chapter" id="ch9"><span class="num">9</span>Authorization — কে কী করতে পারবে<span class="mk">[[C9]]</span></h1>
+
+<h2>9.1 তিনটি helper, তিন রকম প্রশ্ন</h2>
+<table class="data">
+  <tr><th style="width:27%">Helper</th><th style="width:30%">কী প্রশ্ন করে</th><th>ব্যর্থ হলে</th></tr>
+  <tr><td><span class="mono">requireUser(request)</span></td><td>“তুমি কি আদৌ login করা?”</td>
+      <td><span class="mono">401 Authentication required</span></td></tr>
+  <tr><td><span class="mono">requireRole(request, ["ADMIN"])</span></td><td>“তোমার রোল কি অনুমোদিত তালিকায়?”</td>
+      <td><span class="mono">403 You do not have permission…</span></td></tr>
+  <tr><td><span class="mono">requireOwnerOrRole(request, ownerId, ["ADMIN"])</span></td>
+      <td>“এটা কি তোমারই জিনিস, নাকি তুমি admin?”</td>
+      <td><span class="mono">403</span></td></tr>
+</table>
+<pre>export function requireOwnerOrRole(request, ownerId, roles) {
+  const session = requireUser(request);
+  if (session.userId === ownerId || roles.includes(session.role)) return session;
+  throw new ApiError("You do not have permission to perform this action", 403);
+}</pre>
+
+<h2>9.2 IDOR ঠেকানো — বাস্তব উদাহরণ</h2>
+<p><strong>IDOR</strong> (Insecure Direct Object Reference) মানে — URL-এ অন্যের id বসিয়ে দিলে তার ডেটা
+দেখা যাওয়া। Fair Harvest-এ এটি নিয়মিতভাবে আটকানো হয়েছে।</p>
+<table class="data">
+  <tr><th style="width:38%">আক্রমণের চেষ্টা</th><th>কী ঘটে</th></tr>
+  <tr><td><span class="mono">GET /api/v1/cart/&lt;অন্যের userId&gt;</span></td>
+      <td><span class="mono">requireOwnerOrRole(request, userId, ["ADMIN"])</span> → 403</td></tr>
+  <tr><td><span class="mono">GET /api/v1/orders/&lt;অন্যের userId&gt;</span></td><td>একইভাবে 403</td></tr>
+  <tr><td><span class="mono">PATCH /api/v1/products/&lt;অন্য কৃষকের পণ্য&gt;</span></td>
+      <td><span class="mono">assertOwnerOrAdmin()</span> পণ্যটির <span class="mono">farmer.userId</span>
+      মিলিয়ে দেখে → 403</td></tr>
+  <tr><td><span class="mono">GET /api/v1/wishlist</span> — অন্যের wishlist চাওয়া</td>
+      <td>এখানে URL-এ কোনো userId-ই নেই; route সবসময় <span class="mono">session.userId</span> ব্যবহার করে।
+      অর্থাৎ ভুল id পাঠানোর সুযোগই নেই।</td></tr>
+  <tr><td><span class="mono">GET /api/v1/farmer/orders</span></td>
+      <td>farmer profile session থেকে বের করা হয়, client থেকে নয়। তাই এক কৃষক অন্য কৃষকের order item দেখতে পারেন না।</td></tr>
+  <tr><td><span class="mono">PATCH /api/v1/orders/&lt;id&gt;/status</span></td>
+      <td>ADMIN না হলে দেখা হয় — এই order-এর কোনো item কি এই কৃষকের? না হলে 403</td></tr>
+  <tr><td><span class="mono">GET /api/v1/orders/detail/&lt;id&gt;</span></td>
+      <td>ADMIN নয় এবং <span class="mono">session.userId !== order.userId</span> → 403</td></tr>
+</table>
+
+<h2>9.3 ব্যবসায়িক নিয়ম হিসেবে authorization</h2>
+<p>কিছু নিয়ম শুধু রোল নয়, <em>অবস্থা</em> দেখেও সিদ্ধান্ত নেয়:</p>
+<table class="data">
+  <tr><th style="width:38%">নিয়ম</th><th>কোথায় প্রয়োগ হয়</th></tr>
+  <tr><td>verified নয় এমন কৃষক পণ্য তালিকাভুক্ত করতে পারবেন না</td>
+      <td><span class="mono">products/route.js</span> → <span class="mono">if (farmer.verificationStatus !== "VERIFIED") throw 403</span></td></tr>
+  <tr><td>verified নয় এমন কৃষক ছবিও upload করতে পারবেন না</td>
+      <td><span class="mono">uploads/product-image/route.js</span> — যাতে কেউ প্ল্যাটফর্মকে ফ্রি file hosting হিসেবে ব্যবহার না করে</td></tr>
+  <tr><td>শুধু CONSUMER review দিতে পারে</td>
+      <td><span class="mono">reviews/route.js</span> → <span class="mono">if (session.role !== "CONSUMER") throw 403</span></td></tr>
+  <tr><td>কেনা না থাকলে review নয়</td>
+      <td><span class="mono">getReviewEligibility()</span> — DELIVERED order item খোঁজে</td></tr>
+  <tr><td>শুধু নিজের পণ্যে trace event</td>
+      <td><span class="mono">trace/[productId]/route.js</span> — ADMIN বা মালিক কৃষক ছাড়া 403</td></tr>
+  <tr><td>শুধু FARMER নিজের earnings দেখতে পারে</td>
+      <td><span class="mono">farmer/earnings/route.js</span></td></tr>
+</table>
+
+<div class="box ok">
+  <span class="boxTitle">একটি সুন্দর উত্তর তৈরি রাখুন</span>
+  <p>“আমার প্রজেক্টে authorization দুই স্তরে আছে। UI স্তরে RoleGuard শুধু ব্যবহারকারীকে সঠিক পেজে
+  পাঠায় — এটা নিরাপত্তা নয়, সুবিধা। আসল সিদ্ধান্ত সবসময় server-এ হয়, প্রতিটি route handler-এর
+  প্রথম লাইনেই। এবং আমি ইচ্ছাকৃতভাবে client থেকে আসা <span class="mono">userId</span> বা
+  <span class="mono">farmerId</span>-কে কখনো বিশ্বাস করিনি — যেখানে সম্ভব সেটি JWT session থেকেই বের
+  করেছি, যেমন wishlist, farmer/orders আর farmer/earnings-এ।”</p>
+</div>
